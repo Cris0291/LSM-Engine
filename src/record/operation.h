@@ -1,1 +1,1 @@
-enum class OperationRecord { PUT, DELETE };
+enum class OperationRecord : unsigned char { PUT, DELETE };

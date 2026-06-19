@@ -1,13 +1,17 @@
 #include "operation.h"
 #include <array>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <span>
+#include <vector>
 #include <zlib.h>
 
 class RecordEncoder {
 private:
-  std::array<std::uint8_t, 4> to_4_bytes(std::size_t value);
+  void to_4_bytes_little_endian(std::size_t value,
+                                std::array<std::uint8_t, 4> &bytes);
 
 public:
   std::span<std::byte> encode(OperationRecord ops, std::span<std::byte> keys,
