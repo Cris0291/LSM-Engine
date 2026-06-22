@@ -1,5 +1,7 @@
 #include "record-encoder.h"
-#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#include <span>
 
 std::vector<std::byte> RecordEncoder::encode(OperationRecord ops,
                                              std::span<std::byte> keys,
@@ -48,10 +50,36 @@ std::vector<std::byte> RecordEncoder::encode(OperationRecord ops,
 DecodeResult RecordEncoder::decode(std::span<std::byte> record) {
   std::size_t record_size{record.size_bytes()};
   if (record_size < HEADER_SIZE)
-    return {DecodeStatus::TRUNCATED, record, record_size};
+    return {DecodeStatus::TRUNCATED, {}, {}, {}, 0};
 
-  std::uint32_t keys_bytes{from_4_bytes_little_endian(record.subspan(3, 7))};
-  std::uint32_t values_bytes{from_4_bytes_little_endian(record.subspan(8, 11))};
+  std::uint32_t keys_bytes{from_4_bytes_little_endian(record.subspan(5, 4))};
+  std::uint32_t values_bytes{from_4_bytes_little_endian(record.subspan(9, 4))};
+
+  // 64 bit int result so that untrusted keys or values dont overflow
+  std::uint64_t needed{static_cast<std::uint64_t>(HEADER_SIZE) + keys_bytes +
+                       values_bytes};
+
+  if (record_size < needed) {
+    return {DecodeStatus::TRUNCATED, {}, {}, {}, 0};
+  }
+
+  uLong crc{crc32(0L, Z_NULL, 0)};
+  auto starting_pos{record.data() + CHECKSUM_SIZE};
+  crc = crc32(crc, reinterpret_cast<const unsigned char *>(starting_pos),
+              static_cast<uInt>(record_size - CHECKSUM_SIZE));
+
+  std::uint32_t crc_value{from_4_bytes_little_endian(record.subspan(0, 4))};
+  if (crc_value != crc) {
+    return {DecodeStatus::CORRUPTED, {}, {}, {}, 0};
+  }
+
+  std::span<std::byte> op{record.subspan(CHECKSUM_SIZE, 1)};
+  std::span<std::byte> key{record.subspan(HEADER_SIZE, keys_bytes)};
+  std::span<std::byte> value{
+      record.subspan(HEADER_SIZE + keys_bytes, values_bytes)};
+
+  return {DecodeStatus::GOOD, op, key, value,
+          HEADER_SIZE + keys_bytes + values_bytes};
 };
 
 void RecordEncoder::to_4_bytes_little_endian(
@@ -65,10 +93,11 @@ void RecordEncoder::to_4_bytes_little_endian(
 
 std::uint32_t
 RecordEncoder::from_4_bytes_little_endian(std::span<std::byte> bytes_to_copy) {
-  std::uint32_t val32 = static_cast<std::uint32_t>(bytes_to_copy[0]) |
-                        (static_cast<std::uint32_t>(bytes_to_copy[1]) << 8) |
-                        (static_cast<std::uint32_t>(bytes_to_copy[2]) << 16) |
-                        (static_cast<std::uint32_t>(bytes_to_copy[3]) << 24);
+  std::uint32_t val32 =
+      std::to_integer<std::uint32_t>(bytes_to_copy[0]) |
+      (std::to_integer<std::uint32_t>(bytes_to_copy[1]) << 8) |
+      (std::to_integer<std::uint32_t>(bytes_to_copy[2]) << 16) |
+      (std::to_integer<std::uint32_t>(bytes_to_copy[3]) << 24);
 
   return val32;
 };
