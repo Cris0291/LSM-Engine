@@ -1,12 +1,12 @@
 #include "record-encoder.h"
-#include <cstddef>
-#include <cstring>
-#include <span>
 
 std::vector<std::byte> RecordEncoder::encode(OperationRecord ops,
                                              std::span<std::byte> keys,
                                              std::span<std::byte> values) {
   std::vector<std::byte> out{};
+  if (keys.size_bytes() > UINT32_MAX || values.size_bytes() > UINT32_MAX) {
+    throw std::length_error("key or vlaue exceeded maximum encoded value");
+  }
   std::size_t keys_size_bytes{keys.size_bytes()};
   std::size_t values_size_bytes{values.size_bytes()};
   std::array<std::uint8_t, 4> keys_bytes{};
@@ -73,7 +73,7 @@ DecodeResult RecordEncoder::decode(std::span<std::byte> record) {
     return {DecodeStatus::CORRUPTED, {}, {}, {}, 0};
   }
 
-  std::span<std::byte> op{record.subspan(CHECKSUM_SIZE, 1)};
+  OperationRecord op{static_cast<OperationRecord>(record[CHECKSUM_SIZE])};
   std::span<std::byte> key{record.subspan(HEADER_SIZE, keys_bytes)};
   std::span<std::byte> value{
       record.subspan(HEADER_SIZE + keys_bytes, values_bytes)};
