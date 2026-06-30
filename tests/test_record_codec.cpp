@@ -57,20 +57,38 @@ TEST(RecordCodec, Truncation) {
   std::string value_s{"VALUE_TRUNCATION"};
   std::vector<std::byte> key_bytes{bytes(key_s)};
   std::vector<std::byte> value_bytes{bytes(value_s)};
-  std::size_t header_size{13};
-  std::size_t random_less_header{random_between(0, header_size - 1)};
-  std::size_t random_truncation{};
 
   // Act
   auto encode_result{RecordEncoder::encode(put, key_bytes, value_bytes)};
   std::span<std::byte> encode_span(encode_result);
-  random_truncation = random_between(header_size, encode_result.size() - 1);
-  DecodeResult decode_result_less_header{
-      RecordEncoder::decode(encode_span.subspan(0, random_less_header))};
-  DecodeResult decode_result_truncation{
-      RecordEncoder::decode(encode_span.subspan(0, random_truncation))};
 
   // Assert
-  EXPECT_EQ(decode_result_less_header.status, DecodeStatus::TRUNCATED);
-  EXPECT_EQ(decode_result_truncation.status, DecodeStatus::TRUNCATED);
+  for (int n{}; n < encode_result.size(); n++) {
+    DecodeResult decode_result{
+        RecordEncoder::decode(encode_span.subspan(0, n))};
+    EXPECT_EQ(decode_result.status, DecodeStatus::TRUNCATED)
+        << "failed truncation at length " << n;
+  }
+}
+
+TEST(RecordCodec, Corruption) {
+  // Arrange
+  OperationRecord put{OperationRecord::PUT};
+  std::string key_s{"KEY_CORRUPTION"};
+  std::string value_s{"VALUE_CORRUPTION"};
+  std::vector<std::byte> key_bytes{bytes(key_s)};
+  std::vector<std::byte> value_bytes{bytes(value_s)};
+
+  // Act
+  std::vector<std::byte> encode_result{
+      RecordEncoder::encode(put, key_bytes, value_bytes)};
+
+  // Assert
+  for (int i{}; i < encode_result.size(); i++) {
+    auto corrupted = encode_result;
+    corrupted[i] ^= std::byte{0xFF};
+    DecodeResult decode_result{RecordEncoder::decode(corrupted)};
+    EXPECT_NE(decode_result.status, DecodeStatus::GOOD)
+        << "failed truncation at length " << i;
+  }
 }
