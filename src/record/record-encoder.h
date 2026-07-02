@@ -1,6 +1,5 @@
 #include "operation.h"
 #include <array>
-#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>

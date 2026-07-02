@@ -5,7 +5,7 @@ std::vector<std::byte> RecordEncoder::encode(OperationRecord ops,
                                              std::span<std::byte> values) {
   std::vector<std::byte> out{};
   if (keys.size_bytes() > UINT32_MAX || values.size_bytes() > UINT32_MAX) {
-    throw std::length_error("key or vlaue exceeded maximum encoded value");
+    throw std::length_error("key or value exceeded maximum encoded value");
   }
   std::size_t keys_size_bytes{keys.size_bytes()};
   std::size_t values_size_bytes{values.size_bytes()};
