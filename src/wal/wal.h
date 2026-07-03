@@ -17,6 +17,6 @@ public:
   ~Wal();
   void append(OperationRecord op, std::span<std::byte> key,
               std::span<std::byte> value);
-  void replay();
+  bool replay();
   void reset();
 };
