@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
-#include <vector>
 #include <zlib.h>
 
 class RecordEncoder {
