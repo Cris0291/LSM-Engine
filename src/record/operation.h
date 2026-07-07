@@ -18,7 +18,7 @@ struct Record {
   std::vector<std::byte> key;
   std::vector<std::byte> value;
   Record(const DecodeResult &decode_result) : op(decode_result.op) {
-    key.assign(decode_result.key.cbegin(), decode_result.key.cend());
-    value.assign(decode_result.value.cbegin(), decode_result.value.cend());
+    key.assign(decode_result.key.begin(), decode_result.key.end());
+    value.assign(decode_result.value.begin(), decode_result.value.end());
   }
 };
