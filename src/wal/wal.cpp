@@ -1,4 +1,5 @@
 #include "wal.h"
+#include <iostream>
 #include <sys/stat.h>
 
 Wal::Wal(const char *d_path, const char *f_path)
@@ -135,6 +136,7 @@ std::vector<Record> Wal::replay() {
 
 std::vector<Record> Wal::replay_whole_file() {
   std::size_t file_size{get_size()};
+  std::cout << "inside wal replay whole file, file size:" << file_size << "\n";
   std::vector<std::byte> buffer(file_size);
   std::vector<Record> res{};
   std::size_t bytes_read{};
