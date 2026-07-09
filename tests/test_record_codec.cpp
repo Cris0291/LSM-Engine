@@ -50,6 +50,63 @@ TEST(RecordCodec, RoundTripBasic) {
   EXPECT_EQ(decode_result.bytes_read, encode_result.size());
 }
 
+TEST(RecordCodec, RoundTriMultiple) {
+  // Arrange
+
+  // Record 1
+  OperationRecord op{OperationRecord::PUT};
+  std::string key{"key_record"};
+  std::string value{"value_record"};
+  auto key_bytes{bytes(key)};
+  auto value_bytes{bytes(value)};
+
+  // Record 2
+  OperationRecord op1{OperationRecord::PUT};
+  std::string key1{""};
+  std::string value1{""};
+  auto key_bytes1{bytes(key1)};
+  auto value_bytes1{bytes(value1)};
+
+  // Record 3
+  OperationRecord op2{OperationRecord::PUT};
+  std::string key2{"key_large"};
+  std::string value2(5000, 'A');
+  auto key_bytes2{bytes(key2)};
+  auto value_bytes2{bytes(value2)};
+
+  // Act
+  std::vector<std::byte> encode_result{
+      RecordEncoder::encode(op, key_bytes, value_bytes)};
+  DecodeResult decode_result{RecordEncoder::decode(encode_result)};
+
+  std::vector<std::byte> encode_result1{
+      RecordEncoder::encode(op1, key_bytes1, value_bytes1)};
+  DecodeResult decode_result1{RecordEncoder::decode(encode_result1)};
+
+  std::vector<std::byte> encode_result2{
+      RecordEncoder::encode(op2, key_bytes2, value_bytes2)};
+  DecodeResult decode_result2{RecordEncoder::decode(encode_result2)};
+
+  // Assert
+  EXPECT_EQ(decode_result.op, op);
+  EXPECT_EQ(decode_result.status, DecodeStatus::GOOD);
+  EXPECT_TRUE(spans_equals(decode_result.key, key_bytes));
+  EXPECT_TRUE(spans_equals(decode_result.value, value_bytes));
+  EXPECT_EQ(decode_result.bytes_read, encode_result.size());
+
+  EXPECT_EQ(decode_result1.op, op1);
+  EXPECT_EQ(decode_result1.status, DecodeStatus::GOOD);
+  EXPECT_TRUE(spans_equals(decode_result1.key, key_bytes1));
+  EXPECT_TRUE(spans_equals(decode_result1.value, value_bytes1));
+  EXPECT_EQ(decode_result1.bytes_read, encode_result1.size());
+
+  EXPECT_EQ(decode_result2.op, op2);
+  EXPECT_EQ(decode_result2.status, DecodeStatus::GOOD);
+  EXPECT_TRUE(spans_equals(decode_result2.key, key_bytes2));
+  EXPECT_TRUE(spans_equals(decode_result2.value, value_bytes2));
+  EXPECT_EQ(decode_result2.bytes_read, encode_result2.size());
+}
+
 TEST(RecordCodec, Truncation) {
   // Arrange
   OperationRecord put{OperationRecord::PUT};

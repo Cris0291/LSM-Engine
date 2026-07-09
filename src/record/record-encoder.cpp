@@ -66,7 +66,7 @@ DecodeResult RecordEncoder::decode(std::span<std::byte> record) {
   uLong crc{crc32(0L, Z_NULL, 0)};
   auto starting_pos{record.data() + CHECKSUM_SIZE};
   crc = crc32(crc, reinterpret_cast<const unsigned char *>(starting_pos),
-              static_cast<uInt>(record_size - CHECKSUM_SIZE));
+              static_cast<uInt>(needed - CHECKSUM_SIZE));
 
   std::uint32_t crc_value{from_4_bytes_little_endian(record.subspan(0, 4))};
   if (crc_value != crc) {

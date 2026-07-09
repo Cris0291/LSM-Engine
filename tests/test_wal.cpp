@@ -133,16 +133,15 @@ TEST_F(WalTest, TornTailWithReplayWholeFile) {
   // Act
   {
     Wal wal(dir_path.c_str(), file_path.c_str());
+    wal.append(op2, key_bytes2, value_byes2);
     wal.append(op, key_bytes, value_bytes);
     wal.append(op1, key_bytes1, value_bytes1);
-    wal.append(op2, key_bytes2, value_byes2);
+    // wal.append(op2, key_bytes2, value_byes2);
   }
 
   std::error_code ec;
   Wal wal2(dir_path.c_str(), file_path.c_str());
   // fs::resize_file(file_path, 4000, ec);
   std::vector<Record> res{wal2.replay()};
-  std::cout << "file size o disk" << fs::file_size(file_path) << "\n";
-  std::cout << "records recovered" << res.size() << "\n";
   EXPECT_EQ(res.size(), 3);
 }

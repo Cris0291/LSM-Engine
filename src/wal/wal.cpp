@@ -1,6 +1,5 @@
 #include "wal.h"
 #include <iostream>
-#include <sys/stat.h>
 
 Wal::Wal(const char *d_path, const char *f_path)
     : directory_path(d_path), file_path(f_path) {
@@ -69,15 +68,20 @@ std::vector<Record> Wal::replay() {
   bool is_resize{};
 
   while (bytes_read < file_size) {
+    std::cout << "top of the lop bytes read: " << bytes_read << "\n";
     if (decode_result.status == DecodeStatus::TRUNCATED) {
+      std::cout << "top truncation" << "\n";
       // for now lets use memmove later will change to a ring buffer
       pending_bytes = bytes - chunk_bytes;
       if (bytes == pending_bytes && chunk_bytes == 0) {
         old_size = buffer.size();
         buffer.resize(old_size * 2);
         curr_size = buffer.size();
+        std::cout << "case bytes == pending and chunk_bytes == 0 curr_size: "
+                  << curr_size << "old size: " << old_size << "\n";
         is_resize = true;
       } else {
+        std::cout << "normal case" << "\n";
         std::memmove(buffer.data(), buffer.data() + chunk_bytes, pending_bytes);
       }
       is_pending = true;
@@ -85,10 +89,14 @@ std::vector<Record> Wal::replay() {
     if (is_pending && !is_resize) {
       bytes =
           read(fd, buffer.data() + pending_bytes, curr_size - pending_bytes);
+      std::cout << "read is_pending !is_resize: " << pending_bytes
+                << "curr_size: " << curr_size << "\n";
     } else if (is_pending && is_resize) {
       bytes = read(fd, buffer.data() + old_size, curr_size - old_size);
+      std::cout << "read is_pending is_resize" << "\n";
     } else {
       bytes = read(fd, buffer.data(), curr_size);
+      std::cout << "normal read" << "\n";
     }
 
     if (bytes < 0)
@@ -111,12 +119,15 @@ std::vector<Record> Wal::replay() {
         res.emplace_back(decode_result);
         if (is_pending)
           is_pending = false;
+        std::cout << "Good bytes_read: " << bytes_read
+                  << "chunk_bytes: " << chunk_bytes << "\n";
         continue;
       }
       if (decode_result.status == DecodeStatus::CORRUPTED) {
         // it is necessary to distinguish between a truncation or corruption
         // that happened at the tail from one that happen in the middle of the
         // file for now lets just return the decoded records
+        std::cout << "CORRUPTED" << "\n";
         return res;
       }
 
@@ -125,6 +136,7 @@ std::vector<Record> Wal::replay() {
       if (decode_result.status == DecodeStatus::TRUNCATED && !is_pending) {
         // in this case we have to fetch another chunk in orhter to see if there
         // is a problem
+        std::cout << "TRUNCATED" << "\n";
         break;
       }
       // previously we had a truncation
@@ -136,7 +148,6 @@ std::vector<Record> Wal::replay() {
 
 std::vector<Record> Wal::replay_whole_file() {
   std::size_t file_size{get_size()};
-  std::cout << "inside wal replay whole file, file size:" << file_size << "\n";
   std::vector<std::byte> buffer(file_size);
   std::vector<Record> res{};
   std::size_t bytes_read{};
