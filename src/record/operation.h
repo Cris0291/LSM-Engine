@@ -25,3 +25,16 @@ struct Record {
     value.assign(decode_result.value.begin(), decode_result.value.end());
   }
 };
+
+enum class ReplayState {
+  NEWSTATE,
+  READ,
+  RESIZE,
+  DECODE,
+};
+
+enum class ReplayInternalState { TRUNCATED, CORRUPTED };
+
+struct ReplayResult {
+  ReplayInternalState state;
+};

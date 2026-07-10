@@ -1,4 +1,5 @@
 #include "wal.h"
+#include <cstddef>
 #include <iostream>
 
 Wal::Wal(const char *d_path, const char *f_path)
@@ -49,6 +50,67 @@ void Wal::append(OperationRecord op, std::span<std::byte> key,
   // for handling errors
   if (fsync(fd) == -1) {
     throw std::runtime_error("error calling fsync");
+  }
+}
+
+std::vector<Record> Wal::replay() {
+  std::size_t file_size{get_size()};
+  std::size_t to_be_read{};
+  std::vector<std::byte> buffer(BUFFER_SIZE);
+  std::vector<Record> res{};
+  ReplayResult replay_res{};
+  ReplayState stateNow{ReplayState::NEWSTATE};
+  ReplayState stateNext{ReplayState::NEWSTATE};
+  bool truncation_retry{};
+  bool corruption_retry{};
+
+  while (to_be_read < file_size) {
+    switch (stateNow) {
+    case ReplayState::NEWSTATE:
+      if (replay_res.state == ReplayInternalState::TRUNCATED) {
+        truncation_retry = true;
+        stateNext = ReplayState::RESIZE;
+      } else if (replay_res.state == ReplayInternalState::CORRUPTED) {
+        corruption_retry = true;
+        stateNext = ReplayState::RESIZE;
+      }
+    case ReplayState::DECODE:
+      replay_decode(res, buffer);
+      break;
+    }
+    stateNow = stateNext;
+  }
+}
+
+void Wal::replay_decode(std::vector<Record> &res,
+                        std::vector<std::byte> &buffer) {
+  std::size_t buffer_size{buffer.size()};
+  std::size_t chunk_bytes = 0;
+  while (chunk_bytes < buffer_size) {
+    DecodeResult decode_result =
+        RecordEncoder::decode(std::span(buffer).subspan(chunk_bytes));
+    if (decode_result.status == DecodeStatus::GOOD) {
+      chunk_bytes += decode_result.bytes_read;
+      res.emplace_back(decode_result);
+      std::cout << "Good bytes_read:" << "chunk_bytes: " << chunk_bytes << "\n";
+      continue;
+    }
+    if (decode_result.status == DecodeStatus::CORRUPTED) {
+      // it is necessary to distinguish between a truncation or corruption
+      // that happened at the tail from one that happen in the middle of the
+      // file for now lets just return the decoded records
+      std::cout << "CORRUPTED" << "\n";
+    }
+
+    // this is the ugly path right now we must deal with a potential tail torn
+    // or fake trunctation
+    if (decode_result.status == DecodeStatus::TRUNCATED) {
+      // in this case we have to fetch another chunk in orhter to see if there
+      // is a problem
+      std::cout << "TRUNCATED" << "\n";
+    }
+    // previously we had a truncation
+    throw std::runtime_error("record was either truncated or corrupted");
   }
 }
 

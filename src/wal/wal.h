@@ -11,6 +11,7 @@ private:
   const char *file_path;
   int fd;
   std::size_t get_size();
+  void replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer);
 
 public:
   Wal(const char *d_path, const char *f_path);
