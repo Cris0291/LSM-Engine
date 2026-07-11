@@ -1,6 +1,7 @@
 #include "wal.h"
 #include <cstddef>
 #include <iostream>
+#include <sys/types.h>
 
 Wal::Wal(const char *d_path, const char *f_path)
     : directory_path(d_path), file_path(f_path) {
@@ -57,27 +58,70 @@ std::vector<Record> Wal::replay() {
   std::size_t file_size{get_size()};
   std::size_t to_be_read{};
   std::vector<std::byte> buffer(BUFFER_SIZE);
+  std::size_t current_buffer_size{BUFFER_SIZE};
   std::vector<Record> res{};
   ReplayResult replay_res{};
   ReplayState stateNow{ReplayState::NEWSTATE};
   ReplayState stateNext{ReplayState::NEWSTATE};
+  ReplayInternalState internal_state{ReplayInternalState::NOSTATE};
   bool truncation_retry{};
   bool corruption_retry{};
+  std::size_t read_result{};
+  std::size_t pos_offset{};
+  std::size_t leftover{};
+  std::size_t consumed_bytes{};
 
   while (to_be_read < file_size) {
     switch (stateNow) {
     case ReplayState::NEWSTATE:
       if (replay_res.state == ReplayInternalState::TRUNCATED) {
+        if (truncation_retry) {
+          // this ends the fsm
+        } else if (replay_res.consumed_bytes == 0) {
+          stateNext = ReplayState::RESIZE;
+        } else if (replay_res.consumed_bytes != 0) {
+          stateNext = ReplayState::MOVE;
+        }
         truncation_retry = true;
-        stateNext = ReplayState::RESIZE;
       } else if (replay_res.state == ReplayInternalState::CORRUPTED) {
+        if (corruption_retry) {
+          // this ends the fsm
+        } else if (replay_res.consumed_bytes == 0) {
+          stateNext = ReplayState::RESIZE;
+        } else if (replay_res.consumed_bytes != 0) {
+          stateNext = ReplayState::MOVE;
+        }
         corruption_retry = true;
-        stateNext = ReplayState::RESIZE;
+      } else {
+        stateNext = ReplayState::READ;
       }
     case ReplayState::DECODE:
       replay_decode(res, buffer);
       break;
+    case ReplayState::READ:
+      std::size_t read_result =
+          replay_read(buffer, replay_res.pos_offset, replay_res.leftover);
+      if (read_result < 0) {
+        internal_state = ReplayInternalState::BYTESLESSTHANZERO;
+      } else if (read_result == 0) {
+        internal_state = ReplayInternalState::ENDOFFILE;
+      } else {
+        internal_state = ReplayInternalState::NOSTATE;
+      }
+      stateNext = ReplayState::NEWSTATE;
     }
+    replay_res.state = internal_state;
+    replay_res.consumed_bytes = consumed_bytes;
+    replay_res.total_buffer_bytes = read_result;
+    replay_res.pos_offset = pos_offset;
+    replay_res.leftover = leftover;
+
+    internal_state = ReplayInternalState::NOSTATE;
+    consumed_bytes = 0;
+    read_result = 0;
+    pos_offset = 0;
+    leftover = current_buffer_size;
+
     stateNow = stateNext;
   }
 }
@@ -112,6 +156,15 @@ void Wal::replay_decode(std::vector<Record> &res,
     // previously we had a truncation
     throw std::runtime_error("record was either truncated or corrupted");
   }
+}
+
+std::size_t Wal::replay_read(std::vector<std::byte> &buffer,
+                             std::size_t pos_offset, std::size_t leftover) {
+
+  ssize_t bytes = read(fd, buffer.data() + pos_offset, leftover);
+  std::cout << "normal read" << "\n";
+
+  return bytes;
 }
 
 std::vector<Record> Wal::replay() {

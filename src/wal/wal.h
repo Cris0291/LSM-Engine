@@ -12,6 +12,8 @@ private:
   int fd;
   std::size_t get_size();
   void replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer);
+  std::size_t replay_read(std::vector<std::byte> &buffer,
+                          std::size_t pos_offset, std::size_t leftover);
 
 public:
   Wal(const char *d_path, const char *f_path);

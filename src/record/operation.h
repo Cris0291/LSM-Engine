@@ -26,15 +26,20 @@ struct Record {
   }
 };
 
-enum class ReplayState {
-  NEWSTATE,
-  READ,
-  RESIZE,
-  DECODE,
-};
+enum class ReplayState { NEWSTATE, READ, RESIZE, DECODE, MOVE };
 
-enum class ReplayInternalState { TRUNCATED, CORRUPTED };
+enum class ReplayInternalState {
+  TRUNCATED,
+  CORRUPTED,
+  BYTESLESSTHANZERO,
+  NOSTATE,
+  ENDOFFILE
+};
 
 struct ReplayResult {
   ReplayInternalState state;
+  std::size_t total_buffer_bytes;
+  std::size_t consumed_bytes;
+  std::size_t pos_offset;
+  std::size_t leftover;
 };
