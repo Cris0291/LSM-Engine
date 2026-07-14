@@ -11,9 +11,12 @@ private:
   const char *file_path;
   int fd;
   std::size_t get_size();
-  void replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer);
+  void replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
+                     std::size_t buffer_size);
   std::size_t replay_read(std::vector<std::byte> &buffer,
                           std::size_t pos_offset, std::size_t leftover);
+  void replay_move(std::vector<std::byte> &buffer, std::size_t comsumed,
+                   std::size_t pending);
 
 public:
   Wal(const char *d_path, const char *f_path);

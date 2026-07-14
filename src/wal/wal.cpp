@@ -70,6 +70,7 @@ std::vector<Record> Wal::replay() {
   std::size_t pos_offset{};
   std::size_t leftover{};
   std::size_t consumed_bytes{};
+  std::size_t current_total_buffer_bytes{};
 
   while (to_be_read < file_size) {
     switch (stateNow) {
@@ -96,7 +97,19 @@ std::vector<Record> Wal::replay() {
         stateNext = ReplayState::READ;
       }
     case ReplayState::DECODE:
-      replay_decode(res, buffer);
+      replay_decode(res, buffer, replay_res.total_buffer_bytes);
+      break;
+    case ReplayState::MOVE:
+      std::size_t new_total_buffer_size{replay_res.total_buffer_bytes -
+                                        replay_res.consumed_bytes};
+      replay_move(buffer, replay_res.consumed_bytes,
+                  replay_res.total_buffer_bytes - replay_res.consumed_bytes);
+      current_total_buffer_bytes = new_total_buffer_size;
+      pos_offset = new_total_buffer_size;
+      leftover = current_buffer_size - current_total_buffer_bytes;
+      truncation_retry = false;
+      consumed_bytes = false;
+      stateNext = ReplayState::DECODE;
       break;
     case ReplayState::READ:
       std::size_t read_result =
@@ -112,12 +125,13 @@ std::vector<Record> Wal::replay() {
     }
     replay_res.state = internal_state;
     replay_res.consumed_bytes = consumed_bytes;
-    replay_res.total_buffer_bytes = read_result;
+    replay_res.total_buffer_bytes = current_total_buffer_bytes + read_result;
     replay_res.pos_offset = pos_offset;
     replay_res.leftover = leftover;
 
     internal_state = ReplayInternalState::NOSTATE;
     consumed_bytes = 0;
+    current_total_buffer_bytes = 0;
     read_result = 0;
     pos_offset = 0;
     leftover = current_buffer_size;
@@ -127,8 +141,8 @@ std::vector<Record> Wal::replay() {
 }
 
 void Wal::replay_decode(std::vector<Record> &res,
-                        std::vector<std::byte> &buffer) {
-  std::size_t buffer_size{buffer.size()};
+                        std::vector<std::byte> &buffer,
+                        std::size_t buffer_size) {
   std::size_t chunk_bytes = 0;
   while (chunk_bytes < buffer_size) {
     DecodeResult decode_result =
@@ -165,6 +179,10 @@ std::size_t Wal::replay_read(std::vector<std::byte> &buffer,
   std::cout << "normal read" << "\n";
 
   return bytes;
+}
+
+void Wal::replay_move(std::vector<std::byte> &buffer) {
+  std::memmove(buffer.data(), buffer.data() + chunk_bytes, pending_bytes);
 }
 
 std::vector<Record> Wal::replay() {
