@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <utility>
 
 class Wal {
 private:
@@ -11,8 +12,9 @@ private:
   const char *file_path;
   int fd;
   std::size_t get_size();
-  void replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
-                     std::size_t buffer_size);
+  std::pair<std::size_t, DecodeStatus>
+  replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
+                std::size_t buffer_size);
   std::size_t replay_read(std::vector<std::byte> &buffer,
                           std::size_t pos_offset, std::size_t leftover);
   void replay_move(std::vector<std::byte> &buffer, std::size_t comsumed,
