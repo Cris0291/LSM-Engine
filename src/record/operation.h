@@ -33,7 +33,8 @@ enum class ReplayInternalState {
   CORRUPTED,
   BYTESLESSTHANZERO,
   NOSTATE,
-  ENDOFFILE
+  ENDOFFILE,
+  PROCESS
 };
 
 struct ReplayResult {

@@ -19,6 +19,7 @@ private:
                           std::size_t pos_offset, std::size_t leftover);
   void replay_move(std::vector<std::byte> &buffer, std::size_t comsumed,
                    std::size_t pending);
+  std::size_t replay_resize(std::vector<std::byte> &buffer);
 
 public:
   Wal(const char *d_path, const char *f_path);
