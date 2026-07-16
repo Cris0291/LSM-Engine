@@ -15,8 +15,8 @@ private:
   std::pair<std::size_t, DecodeStatus>
   replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
                 std::size_t buffer_size);
-  std::size_t replay_read(std::vector<std::byte> &buffer,
-                          std::size_t pos_offset, std::size_t leftover);
+  ssize_t replay_read(std::vector<std::byte> &buffer, std::size_t pos_offset,
+                      std::size_t leftover, std::size_t file_pos);
   void replay_move(std::vector<std::byte> &buffer, std::size_t comsumed,
                    std::size_t pending);
   std::size_t replay_resize(std::vector<std::byte> &buffer);
