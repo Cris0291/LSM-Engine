@@ -67,8 +67,10 @@ std::vector<Record> Wal::replay() {
   bool last_decode_guard{false};
 
   while (bytes_processed < file_size || last_decode_guard) {
+
     switch (stateNow) {
     case ReplayState::NEWSTATE: {
+
       if (replay_res.state == ReplayInternalState::TRUNCATED ||
           replay_res.state == ReplayInternalState::CORRUPTED) {
         // Note that these two states are being evaluated together because
@@ -97,6 +99,7 @@ std::vector<Record> Wal::replay() {
       break;
     }
     case ReplayState::DECODE: {
+
       auto pair = replay_decode(res, buffer, replay_res.total_buffer_bytes);
       replay_res.consumed_bytes = pair.first;
       if (pair.second == DecodeStatus::GOOD) {
@@ -113,6 +116,7 @@ std::vector<Record> Wal::replay() {
       break;
     }
     case ReplayState::MOVE: {
+
       std::size_t new_total_buffer_size{replay_res.total_buffer_bytes -
                                         replay_res.consumed_bytes};
       replay_move(buffer, replay_res.consumed_bytes, new_total_buffer_size);
@@ -125,6 +129,7 @@ std::vector<Record> Wal::replay() {
       break;
     }
     case ReplayState::RESIZE: {
+      std::cout << "7" << "\n";
       current_buffer_size = replay_resize(buffer);
       replay_res.pos_offset = replay_res.total_buffer_bytes;
       replay_res.leftover = current_buffer_size - replay_res.total_buffer_bytes;
@@ -132,6 +137,7 @@ std::vector<Record> Wal::replay() {
       break;
     }
     case ReplayState::READ: {
+
       ssize_t read_result = replay_read(buffer, replay_res.pos_offset,
                                         replay_res.leftover, bytes_processed);
       if (read_result < 0) {
@@ -150,8 +156,10 @@ std::vector<Record> Wal::replay() {
       break;
     }
     }
+
     stateNow = stateNext;
   }
+
   return res;
 }
 
@@ -166,14 +174,12 @@ Wal::replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
     if (decode_result.status == DecodeStatus::GOOD) {
       chunk_bytes += decode_result.bytes_read;
       res.emplace_back(decode_result);
-      std::cout << "Good bytes_read:" << "chunk_bytes: " << chunk_bytes << "\n";
       continue;
     }
     if (decode_result.status == DecodeStatus::CORRUPTED) {
       // it is necessary to distinguish between a truncation or corruption
       // that happened at the tail from one that happen in the middle of the
       // file for now lets just return the decoded records
-      std::cout << "CORRUPTED" << "\n";
       break;
     }
 
@@ -182,7 +188,6 @@ Wal::replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
     if (decode_result.status == DecodeStatus::TRUNCATED) {
       // in this case we have to fetch another chunk in orhter to see if there
       // is a problem
-      std::cout << "TRUNCATED" << "\n";
       break;
     }
     // previously we had a truncation
@@ -194,8 +199,7 @@ Wal::replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
 ssize_t Wal::replay_read(std::vector<std::byte> &buffer, std::size_t pos_offset,
                          std::size_t leftover, std::size_t file_pos) {
 
-  ssize_t bytes = pread(fd, buffer.data() + pos_offset, leftover, pos_offset);
-  std::cout << "normal read" << "\n";
+  ssize_t bytes = pread(fd, buffer.data() + pos_offset, leftover, file_pos);
 
   return bytes;
 }
