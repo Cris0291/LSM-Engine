@@ -1,6 +1,5 @@
 #include "node.h"
 #include <cstring>
-#include <utility>
 
 class Memtable {
 private:
@@ -9,10 +8,10 @@ private:
   Node *top;
   int compare_bytes(const std::vector<std::byte> &a,
                     const std::vector<std::byte> &b);
-  std::pair<Node *, bool> search_for_node(const std::vector<std::byte> &key,
-                                          const std::vector<std::byte> &value);
+  bool search_for_node(const std::vector<std::byte> &key,
+                       std::vector<Node *> &update);
 
 public:
-  Node *search(std::vector<std::byte> key, std::vector<std::byte> value);
+  Node *search(std::vector<std::byte> key);
   void insert(std::vector<std::byte> key, std::vector<std::byte> value);
 };

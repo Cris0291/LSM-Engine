@@ -1,10 +1,15 @@
 #include "memtable.h"
 #include <algorithm>
-#include <stdexcept>
 
-std::pair<Node *, bool>
-Memtable::search_for_node(const std::vector<std::byte> &key,
-                          const std::vector<std::byte> &value) {
+bool Memtable::search_for_node(const std::vector<std::byte> &key,
+                               std::vector<Node *> &update) {
+  // in this case update is needed to record the path needed to reach the 0 list
+  // in update just the nodes that changed level the ones that went downward are
+  // being pushed since this si the rightmost view and the one that actually is
+  // relevant to the node once it is promoted the last node of update has two
+  // menings either it is the node we are looking for or an approximation of the
+  // last level
+
   Node *temp{top};
   Node *res{nullptr};
   int temp_level{current_height};
@@ -13,9 +18,10 @@ Memtable::search_for_node(const std::vector<std::byte> &key,
   while (temp_level > 0) {
     if (!temp->next) {
       temp = temp->forward_list[temp_level--];
+      update.push_back(temp);
       continue;
     }
-    comparison_res = compare_bytes(value, temp->next->value);
+    comparison_res = compare_bytes(key, temp->next->key);
     // Horizontal path if value is less
     if (comparison_res < 0) {
       temp = temp->next;
@@ -23,44 +29,40 @@ Memtable::search_for_node(const std::vector<std::byte> &key,
     } else if (comparison_res > 0) {
       // Vertical path if value is greater
       temp = temp->forward_list[temp_level--];
+      update.push_back(temp);
       continue;
     } else {
       // there should be no duplication but i dont know how this would work with
       // bit patterns for now lets assume that no duplication might happen i
       // will refine later if key is not the same for now i will throw
-      int compare_key = compare_bytes(key, temp->next->key);
-      if (compare_key != 0)
-        throw std::runtime_error("duplicate node found");
       res = temp->next;
+      update.push_back(res);
       break;
     }
   }
 
   if (res)
-    return {res, true};
+    return true;
 
-  return {temp, false};
+  return false;
 };
 
-Node *Memtable::search(std::vector<std::byte> key,
-                       std::vector<std::byte> value) {
+Node *Memtable::search(std::vector<std::byte> key) {
   Node *res{nullptr};
   int comparison_res{};
-  auto res_search{search_for_node(key, value)};
+  std::vector<Node *> update{};
+  auto is_same_node{search_for_node(key, update)};
 
-  if (res_search.second) {
-    return res_search.first;
+  if (is_same_node) {
+    return update.back();
   } else {
     // in this case we hit the bottom list without an early find
     // so we need to iterate over the last linkeked list segment until we find
     // our node
-    Node *temp{res_search.first};
+    Node *temp{update.back()};
     while (temp->next) {
-      comparison_res = compare_bytes(value, temp->next->value);
+      comparison_res = compare_bytes(key, temp->next->value);
       if (comparison_res == 0) {
-        int compare_key = compare_bytes(key, temp->next->key);
-        if (compare_key != 0)
-          throw std::runtime_error("duplicate node found");
         res = temp->next;
         break;
       }
@@ -72,7 +74,34 @@ Node *Memtable::search(std::vector<std::byte> key,
 
 void Memtable::insert(std::vector<std::byte> key,
                       std::vector<std::byte> value) {
+  std::vector<Node *> update{};
+  bool is_same_node{search_for_node(key, update)};
+  Node *temp{update.back()};
 
+  // first case the node was already there we just update
+  if (is_same_node) {
+    temp->value = std::move(value);
+    return;
+  }
+
+  // second case we need to insert
+  while (temp->next) {
+    int comparison_res = compare_bytes(key, temp->next->value);
+    if (comparison_res < 0) {
+      temp = temp->next;
+      continue;
+    }
+
+    if (comparison_res > 0) {
+      // this is the point in which insertion must happen
+      break;
+    }
+
+    if (comparison_res == 0) {
+      temp->value = std::move(value);
+      return;
+    }
+  }
 };
 
 int Memtable::compare_bytes(const std::vector<std::byte> &a,
