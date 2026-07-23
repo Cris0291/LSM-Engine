@@ -1,5 +1,9 @@
 #include "memtable.h"
 #include <algorithm>
+#include <bit>
+#include <cstdint>
+
+Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed){};
 
 bool Memtable::search_for_node(const std::vector<std::byte> &key,
                                std::vector<Node *> &update) {
@@ -108,4 +112,10 @@ int Memtable::compare_bytes(const std::vector<std::byte> &a,
                             const std::vector<std::byte> &b) {
   int res{std::memcmp(a.data(), b.data(), std::min(a.size(), b.size()))};
   return res;
-}
+};
+
+int Memtable::random_height() {
+  uint32_t random_number{static_cast<uint32_t>(rng())};
+  int height{std::min(std::countl_zero(random_number) + 1, MAX_HEIGHT)};
+  return height;
+};
