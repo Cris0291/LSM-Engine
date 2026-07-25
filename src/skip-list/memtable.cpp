@@ -70,14 +70,15 @@ Node *Memtable::search(std::vector<std::byte> key) {
         res = temp->next;
         break;
       }
+      temp = temp->next;
     }
   }
 
   return res;
 };
 
-void Memtable::insert(std::vector<std::byte> key,
-                      std::vector<std::byte> value) {
+void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
+                      OperationRecord op) {
   std::vector<Node *> update{};
   bool is_same_node{search_for_node(key, update)};
   Node *temp{update.back()};
@@ -106,6 +107,69 @@ void Memtable::insert(std::vector<std::byte> key,
       return;
     }
   }
+
+  int height{random_height()};
+  Node *node{new Node(std::move(key), std::move(value), op, height)};
+  Node *after{temp->next};
+  temp->next = node;
+  node->next = after;
+
+  if (height == 1)
+    return;
+
+  auto it{update.rbegin() + 1};
+
+  // in this case we dont want the last level of height since that is the base
+  // list if height is n that n is level 1 the order is inverse the same goes to
+  // the current height variable
+  height -= 1;
+  for (; it != update.rend(); it++) {
+    if (height <= 0)
+      break;
+
+    temp = *it;
+    after = temp->next;
+    temp->next = node->forward_list[height];
+    node->forward_list[height]->next = after;
+    height -= 1;
+  }
+
+  if (height == 0)
+    return;
+
+  while (height) {
+    Node *new_top{};
+    sentinel_list[current_height] = new_top;
+    current_height -= 1;
+    new_top->next = node->forward_list[height];
+    node->forward_list[height]->next = nullptr;
+    height -= 1;
+  }
+
+  return;
+};
+
+bool Memtable::delete_node(std::vector<std::byte> key) {
+  std::vector<Node *> update{};
+  bool is_same_node{search_for_node(key, update)};
+  Node *res{nullptr};
+
+  if (is_same_node) {
+    res = update.back();
+  } else {
+    Node *temp{update.back()};
+    while (temp->next) {
+      int comparison_res = compare_bytes(key, temp->next->value);
+      if (comparison_res == 0) {
+        res = temp->next;
+        break;
+      }
+      temp = temp->next;
+    }
+  }
+
+  if (!res)
+    return false;
 };
 
 int Memtable::compare_bytes(const std::vector<std::byte> &a,

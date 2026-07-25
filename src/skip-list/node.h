@@ -7,6 +7,7 @@ public:
   OperationRecord op;
   std::vector<Node *> forward_list;
   Node *next;
+  Node() = default;
   Node(std::vector<std::byte> &&_key, std::vector<std::byte> &&_value,
        OperationRecord _op, std::size_t height);
 };
