@@ -6,15 +6,14 @@
 class Memtable {
 private:
   static constexpr int MAX_HEIGHT{32};
-  const Node *sentinel_list[MAX_HEIGHT];
   const uint32_t seed;
-  int current_height{31};
+  int current_height{0};
   Node *top;
   std::mt19937 rng;
   int compare_bytes(const std::vector<std::byte> &a,
                     const std::vector<std::byte> &b);
-  bool search_for_node(const std::vector<std::byte> &key,
-                       std::vector<Node *> &update);
+  std::pair<Node *, bool> search_for_node(const std::vector<std::byte> &key,
+                                          std::vector<Node *> &update);
   int random_height();
 
 public:

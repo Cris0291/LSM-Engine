@@ -3,147 +3,117 @@
 #include <bit>
 #include <cstdint>
 
-Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed){};
+Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
+  Node *node{new Node(MAX_HEIGHT)};
+  top = node;
+};
 
-bool Memtable::search_for_node(const std::vector<std::byte> &key,
-                               std::vector<Node *> &update) {
-  // in this case update is needed to record the path needed to reach the 0 list
-  // in update just the nodes that changed level the ones that went downward are
-  // being pushed since this si the rightmost view and the one that actually is
-  // relevant to the node once it is promoted the last node of update has two
-  // menings either it is the node we are looking for or an approximation of the
-  // last level
-
+std::pair<Node *, bool>
+Memtable::search_for_node(const std::vector<std::byte> &key,
+                          std::vector<Node *> &update) {
   Node *temp{top};
   Node *res{nullptr};
   int temp_level{current_height};
   int comparison_res{};
 
   while (temp_level > 0) {
-    if (!temp->next) {
-      temp = temp->forward_list[temp_level--];
-      update.push_back(temp);
+    if (!temp->forward_list[temp_level]) {
+      if (update.back() != temp)
+        update.push_back(temp);
+      temp_level -= 1;
       continue;
     }
-    comparison_res = compare_bytes(key, temp->next->key);
+    comparison_res = compare_bytes(key, temp->forward_list[temp_level]->key);
     // Horizontal path if value is less
     if (comparison_res < 0) {
-      temp = temp->next;
+      temp = temp->forward_list[temp_level];
       continue;
     } else if (comparison_res > 0) {
       // Vertical path if value is greater
-      temp = temp->forward_list[temp_level--];
-      update.push_back(temp);
+      if (update.back() != temp)
+        update.push_back(temp);
+      temp_level -= 1;
       continue;
     } else {
-      // there should be no duplication but i dont know how this would work with
-      // bit patterns for now lets assume that no duplication might happen i
-      // will refine later if key is not the same for now i will throw
-      res = temp->next;
-      update.push_back(res);
+      res = temp->forward_list[temp_level];
       break;
     }
   }
 
   if (res)
-    return true;
+    return {res, true};
 
-  return false;
-};
-
-Node *Memtable::search(std::vector<std::byte> key) {
-  Node *res{nullptr};
-  int comparison_res{};
-  std::vector<Node *> update{};
-  auto is_same_node{search_for_node(key, update)};
-
-  if (is_same_node) {
-    return update.back();
-  } else {
-    // in this case we hit the bottom list without an early find
-    // so we need to iterate over the last linkeked list segment until we find
-    // our node
-    Node *temp{update.back()};
-    while (temp->next) {
-      comparison_res = compare_bytes(key, temp->next->value);
-      if (comparison_res == 0) {
-        res = temp->next;
-        break;
-      }
-      temp = temp->next;
+  // lineal search over the level 0
+  while (temp->forward_list[temp_level]) {
+    comparison_res = compare_bytes(key, temp->forward_list[temp_level]->key);
+    if (comparison_res < 0) {
+      temp = temp->forward_list[temp_level];
+      continue;
+    } else if (comparison_res > 0) {
+      break;
+    } else {
+      return {temp, true};
     }
   }
 
-  return res;
+  return {temp, false};
+};
+
+Node *Memtable::search(std::vector<std::byte> key) {
+  std::vector<Node *> update{};
+  auto res{search_for_node(key, update)};
+
+  if (res.second)
+    return res.first;
+
+  return nullptr;
 };
 
 void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
                       OperationRecord op) {
   std::vector<Node *> update{};
-  bool is_same_node{search_for_node(key, update)};
-  Node *temp{update.back()};
+  auto res{search_for_node(key, update)};
+  Node *temp{nullptr};
 
   // first case the node was already there we just update
-  if (is_same_node) {
-    temp->value = std::move(value);
+  if (res.second) {
+    res.first->value = std::move(value);
     return;
   }
 
   // second case we need to insert
-  while (temp->next) {
-    int comparison_res = compare_bytes(key, temp->next->value);
-    if (comparison_res < 0) {
-      temp = temp->next;
-      continue;
-    }
-
-    if (comparison_res > 0) {
-      // this is the point in which insertion must happen
-      break;
-    }
-
-    if (comparison_res == 0) {
-      temp->value = std::move(value);
-      return;
-    }
-  }
 
   int height{random_height()};
   Node *node{new Node(std::move(key), std::move(value), op, height)};
-  Node *after{temp->next};
-  temp->next = node;
-  node->next = after;
+  Node *after{res.first->forward_list[0]};
+  res.first->forward_list[0] = node;
+  node->forward_list[0] = after;
 
   if (height == 1)
     return;
 
-  auto it{update.rbegin() + 1};
+  auto it{update.rbegin()};
 
-  // in this case we dont want the last level of height since that is the base
-  // list if height is n that n is level 1 the order is inverse the same goes to
-  // the current height variable
-  height -= 1;
+  int curr_level{1};
   for (; it != update.rend(); it++) {
-    if (height <= 0)
+    if (curr_level == height)
       break;
 
     temp = *it;
-    after = temp->next;
-    temp->next = node->forward_list[height];
-    node->forward_list[height]->next = after;
-    height -= 1;
+    after = temp->forward_list[curr_level];
+    temp->forward_list[curr_level] = res.first;
+    res.first->forward_list[curr_level] = after;
+    curr_level += 1;
   }
 
-  if (height == 0)
+  if ((height - curr_level) == 0)
     return;
 
-  while (height) {
-    Node *new_top{};
-    sentinel_list[current_height] = new_top;
-    current_height -= 1;
-    new_top->next = node->forward_list[height];
-    node->forward_list[height]->next = nullptr;
-    height -= 1;
+  while (curr_level < height) {
+    after = top->forward_list[current_height];
+    top->forward_list[current_height] = res.first;
+    res.first->forward_list[current_height] = after;
+    current_height += 1;
   }
 
   return;
@@ -151,25 +121,13 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
 
 bool Memtable::delete_node(std::vector<std::byte> key) {
   std::vector<Node *> update{};
-  bool is_same_node{search_for_node(key, update)};
-  Node *res{nullptr};
+  auto res{search_for_node(key, update)};
 
-  if (is_same_node) {
-    res = update.back();
-  } else {
-    Node *temp{update.back()};
-    while (temp->next) {
-      int comparison_res = compare_bytes(key, temp->next->value);
-      if (comparison_res == 0) {
-        res = temp->next;
-        break;
-      }
-      temp = temp->next;
-    }
+  if (res.second) {
+    res.first->tombstone = true;
   }
 
-  if (!res)
-    return false;
+  return res.second;
 };
 
 int Memtable::compare_bytes(const std::vector<std::byte> &a,
