@@ -8,9 +8,8 @@ Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
   top = node;
 };
 
-std::pair<Node *, bool>
-Memtable::search_for_node(const std::vector<std::byte> &key,
-                          std::vector<Node *> &update) {
+Node *Memtable::search_for_node(const std::vector<std::byte> &key,
+                                std::vector<Node *> &update) {
   Node *temp{top};
   Node *res{nullptr};
   int temp_level{current_height};
@@ -18,8 +17,7 @@ Memtable::search_for_node(const std::vector<std::byte> &key,
 
   while (temp_level > 0) {
     if (!temp->forward_list[temp_level]) {
-      if (update.back() != temp)
-        update.push_back(temp);
+      update[temp_level] = temp;
       temp_level -= 1;
       continue;
     }
@@ -30,8 +28,7 @@ Memtable::search_for_node(const std::vector<std::byte> &key,
       continue;
     } else if (comparison_res > 0) {
       // Vertical path if value is greater
-      if (update.back() != temp)
-        update.push_back(temp);
+      update[temp_level] = temp;
       temp_level -= 1;
       continue;
     } else {
@@ -41,7 +38,7 @@ Memtable::search_for_node(const std::vector<std::byte> &key,
   }
 
   if (res)
-    return {res, true};
+    return res;
 
   // lineal search over the level 0
   while (temp->forward_list[temp_level]) {
@@ -50,34 +47,41 @@ Memtable::search_for_node(const std::vector<std::byte> &key,
       temp = temp->forward_list[temp_level];
       continue;
     } else if (comparison_res > 0) {
+      update[temp_level] = temp;
       break;
     } else {
-      return {temp, true};
+      return temp;
     }
   }
 
-  return {temp, false};
+  return res;
 };
 
 Node *Memtable::search(std::vector<std::byte> key) {
-  std::vector<Node *> update{};
-  auto res{search_for_node(key, update)};
+  std::vector<Node *> update(current_height);
+  Node *res{search_for_node(key, update)};
 
-  if (res.second)
-    return res.first;
+  if (res)
+    return res;
 
   return nullptr;
 };
 
 void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
-                      OperationRecord op) {
-  std::vector<Node *> update{};
-  auto res{search_for_node(key, update)};
+                      OperationRecord op, bool tombstone) {
+  std::vector<Node *> update(current_height);
+  Node *res{search_for_node(key, update)};
   Node *temp{nullptr};
+  Node *after{nullptr};
+  int curr_level{0};
 
   // first case the node was already there we just update
-  if (res.second) {
-    res.first->value = std::move(value);
+  if (res) {
+    if (tombstone) {
+      res->value = value;
+      res->op = op;
+    }
+    res->value = std::move(value);
     return;
   }
 
@@ -85,54 +89,51 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
 
   int height{random_height()};
   Node *node{new Node(std::move(key), std::move(value), op, height)};
-  Node *after{res.first->forward_list[0]};
-  res.first->forward_list[0] = node;
-  node->forward_list[0] = after;
 
-  if (height == 1)
-    return;
-
-  auto it{update.rbegin()};
-
-  int curr_level{1};
-  for (; it != update.rend(); it++) {
+  for (int i{}; i < update.size(); i++) {
     if (curr_level == height)
       break;
 
-    temp = *it;
+    temp = update[i];
     after = temp->forward_list[curr_level];
-    temp->forward_list[curr_level] = res.first;
-    res.first->forward_list[curr_level] = after;
+    temp->forward_list[curr_level] = node;
+    node->forward_list[curr_level] = after;
     curr_level += 1;
   }
 
-  if ((height - curr_level) == 0)
+  if (height == curr_level)
     return;
 
   while (curr_level < height) {
-    after = top->forward_list[current_height];
-    top->forward_list[current_height] = res.first;
-    res.first->forward_list[current_height] = after;
-    current_height += 1;
+    after = top->forward_list[curr_level];
+    top->forward_list[curr_level] = node;
+    node->forward_list[curr_level] = after;
+
+    curr_level += 1;
   }
 
+  std::size_t to_be_added_levels{height - update.size()};
+  current_height += to_be_added_levels;
   return;
 };
 
-bool Memtable::delete_node(std::vector<std::byte> key) {
-  std::vector<Node *> update{};
-  auto res{search_for_node(key, update)};
-
-  if (res.second) {
-    res.first->tombstone = true;
-  }
-
-  return res.second;
+void Memtable::delete_node(std::vector<std::byte> key) {
+  insert(key, {}, OperationRecord::DELETE, true);
+  return;
 };
 
 int Memtable::compare_bytes(const std::vector<std::byte> &a,
                             const std::vector<std::byte> &b) {
   int res{std::memcmp(a.data(), b.data(), std::min(a.size(), b.size()))};
+  if (res == 0) {
+    if (a.size() < b.size()) {
+      res = -1;
+    } else if (a.size() > b.size()) {
+      res = 1;
+    } else {
+      res = 0;
+    }
+  }
   return res;
 };
 

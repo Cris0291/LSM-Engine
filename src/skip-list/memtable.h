@@ -12,14 +12,14 @@ private:
   std::mt19937 rng;
   int compare_bytes(const std::vector<std::byte> &a,
                     const std::vector<std::byte> &b);
-  std::pair<Node *, bool> search_for_node(const std::vector<std::byte> &key,
-                                          std::vector<Node *> &update);
+  Node *search_for_node(const std::vector<std::byte> &key,
+                        std::vector<Node *> &update);
   int random_height();
 
 public:
   Memtable(uint32_t _seed);
   Node *search(std::vector<std::byte> key);
   void insert(std::vector<std::byte> key, std::vector<std::byte> value,
-              OperationRecord op);
-  bool delete_node(std::vector<std::byte> key);
+              OperationRecord op, bool tombstone);
+  void delete_node(std::vector<std::byte> key);
 };

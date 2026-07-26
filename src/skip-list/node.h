@@ -6,7 +6,6 @@ public:
   std::vector<std::byte> value;
   OperationRecord op;
   std::vector<Node *> forward_list;
-  bool tombstone;
   Node() = default;
   Node(std::size_t height);
   Node(std::vector<std::byte> &&_key, std::vector<std::byte> &&_value,
