@@ -17,6 +17,7 @@ private:
   int random_height();
 
 public:
+  ~Memtable();
   Memtable(uint32_t _seed);
   Node *search(std::vector<std::byte> key);
   void insert(std::vector<std::byte> key, std::vector<std::byte> value,

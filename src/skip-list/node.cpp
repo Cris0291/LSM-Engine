@@ -1,6 +1,7 @@
 #include "node.h"
 
-Node::Node(std::size_t height) : forward_list(height){};
+Node::Node(std::size_t height)
+    : forward_list(height), op(OperationRecord::NO_OP), key({}), value({}){};
 
 Node::Node(std::vector<std::byte> &&_key, std::vector<std::byte> &&_value,
            OperationRecord _op, std::size_t height)

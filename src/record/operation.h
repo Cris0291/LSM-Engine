@@ -1,7 +1,12 @@
 #include <cstddef>
 #include <span>
 #include <vector>
-enum class OperationRecord : unsigned char { PUT, DELETE, PUT_BLOB_REFERENCE };
+enum class OperationRecord : unsigned char {
+  PUT,
+  DELETE,
+  PUT_BLOB_REFERENCE,
+  NO_OP
+};
 
 enum class DecodeStatus { GOOD, TRUNCATED, CORRUPTED };
 

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <bit>
 #include <cstdint>
+#include <optional>
 
 Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
   Node *node{new Node(MAX_HEIGHT)};
@@ -21,7 +22,7 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
       temp_level -= 1;
       continue;
     }
-    comparison_res = compare_bytes(key, temp->forward_list[temp_level]->key);
+    comparison_res = compare_bytes(temp->forward_list[temp_level]->key, key);
     // Horizontal path if value is less
     if (comparison_res < 0) {
       temp = temp->forward_list[temp_level];
@@ -50,7 +51,7 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
       update[temp_level] = temp;
       break;
     } else {
-      return temp;
+      return temp->forward_list[temp_level];
     }
   }
 
@@ -58,7 +59,7 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
 };
 
 Node *Memtable::search(std::vector<std::byte> key) {
-  std::vector<Node *> update(current_height);
+  std::vector<Node *> update(MAX_HEIGHT, top);
   Node *res{search_for_node(key, update)};
 
   if (res)
@@ -69,19 +70,20 @@ Node *Memtable::search(std::vector<std::byte> key) {
 
 void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
                       OperationRecord op, bool tombstone) {
-  std::vector<Node *> update(current_height);
+  std::vector<Node *> update(MAX_HEIGHT, top);
   Node *res{search_for_node(key, update)};
   Node *temp{nullptr};
   Node *after{nullptr};
   int curr_level{0};
 
   // first case the node was already there we just update
-  if (res) {
-    if (tombstone) {
-      res->value = value;
-      res->op = op;
-    }
+  if (res && !tombstone) {
     res->value = std::move(value);
+    return;
+
+  } else if (res && tombstone) {
+    res->value = value;
+    res->op = op;
     return;
   }
 
@@ -101,19 +103,10 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
     curr_level += 1;
   }
 
-  if (height == curr_level)
-    return;
-
-  while (curr_level < height) {
-    after = top->forward_list[curr_level];
-    top->forward_list[curr_level] = node;
-    node->forward_list[curr_level] = after;
-
-    curr_level += 1;
+  if (height > current_height) {
+    int to_be_added_levels{height - current_height};
+    current_height += to_be_added_levels;
   }
-
-  std::size_t to_be_added_levels{height - update.size()};
-  current_height += to_be_added_levels;
   return;
 };
 
@@ -141,4 +134,13 @@ int Memtable::random_height() {
   uint32_t random_number{static_cast<uint32_t>(rng())};
   int height{std::min(std::countl_zero(random_number) + 1, MAX_HEIGHT)};
   return height;
+};
+
+Memtable::~Memtable() {
+  Node *temp{nullptr};
+  while (top) {
+    temp = top->forward_list[0];
+    delete top;
+    top = temp;
+  }
 };
