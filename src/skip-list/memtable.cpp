@@ -3,6 +3,7 @@
 #include <bit>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
   Node *node{new Node(MAX_HEIGHT)};
@@ -107,6 +108,7 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
     int to_be_added_levels{height - current_height};
     current_height += to_be_added_levels;
   }
+  total_node_count += 1;
   return;
 };
 
@@ -134,6 +136,21 @@ int Memtable::random_height() {
   uint32_t random_number{static_cast<uint32_t>(rng())};
   int height{std::min(std::countl_zero(random_number) + 1, MAX_HEIGHT)};
   return height;
+};
+
+std::vector<Memtable::Record> Memtable::linear_iteration() {
+  Node *temp{top};
+  std::vector<Record> records(total_node_count);
+  Record record{};
+
+  while (temp->forward_list[0]) {
+    record.key = temp->forward_list[0]->key;
+    record.value = temp->forward_list[0]->value;
+    record.op = temp->forward_list[0]->op;
+    records.push_back(record);
+  }
+
+  return records;
 };
 
 Memtable::~Memtable() {
