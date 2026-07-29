@@ -15,6 +15,14 @@ add_library(wal_lib src/wal/wal.cpp)
 target_include_directories(wal_lib PUBLIC src/wal)
 target_link_libraries(wal_lib PUBLIC record_codec)
 
+add_library(utility INTERFACE)
+target_include_directories(utility INTERFACE src/utility)
+
+add_library(memtable_lib src/memtable/memtable.cpp)
+target_include_directories(memtable_lib PUBLIC src/memtable)
+target_link_libraries(memtable_lib PUBLIC record_codec)
+target_link_libraries(memtable_lib PUBLIC utility)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -31,6 +39,9 @@ target_link_libraries(codec_tests PRIVATE record_codec GTest::gtest_main)
 
 add_executable(wal_tests tests/test_wal.cpp)
 target_link_libraries(wal_tests PRIVATE record_codec wal_lib GTest::gtest_main)
+
+add_executable(memtable_tests tests/test_memtable.cpp)
+target_link_libraries(memtable_tests PRIVATE record_codec utility GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(codec_tests)
