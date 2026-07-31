@@ -41,9 +41,10 @@ add_executable(wal_tests tests/test_wal.cpp)
 target_link_libraries(wal_tests PRIVATE record_codec wal_lib GTest::gtest_main)
 
 add_executable(memtable_tests tests/test_memtable.cpp)
-target_link_libraries(memtable_tests PRIVATE record_codec utility GTest::gtest_main)
+target_link_libraries(memtable_tests PRIVATE record_codec memtable_lib utility GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(codec_tests)
 gtest_discover_tests(wal_tests)
+gtest_discover_tests(memtable_tests)
 

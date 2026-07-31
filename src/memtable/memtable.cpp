@@ -1,9 +1,7 @@
 #include "memtable.h"
+#include "lsm_utilities.h"
 #include <algorithm>
 #include <bit>
-#include <cstdint>
-#include <optional>
-#include <vector>
 
 Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
   Node *node{new Node(MAX_HEIGHT)};
@@ -44,7 +42,7 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
 
   // lineal search over the level 0
   while (temp->forward_list[temp_level]) {
-    comparison_res = compare_bytes(key, temp->forward_list[temp_level]->key);
+    comparison_res = compare_bytes(temp->forward_list[temp_level]->key, key);
     if (comparison_res < 0) {
       temp = temp->forward_list[temp_level];
       continue;
@@ -105,8 +103,7 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
   }
 
   if (height > current_height) {
-    int to_be_added_levels{height - current_height};
-    current_height += to_be_added_levels;
+    current_height = height;
   }
   total_node_count += 1;
   return;
@@ -117,21 +114,6 @@ void Memtable::delete_node(std::vector<std::byte> key) {
   return;
 };
 
-int Memtable::compare_bytes(const std::vector<std::byte> &a,
-                            const std::vector<std::byte> &b) {
-  int res{std::memcmp(a.data(), b.data(), std::min(a.size(), b.size()))};
-  if (res == 0) {
-    if (a.size() < b.size()) {
-      res = -1;
-    } else if (a.size() > b.size()) {
-      res = 1;
-    } else {
-      res = 0;
-    }
-  }
-  return res;
-};
-
 int Memtable::random_height() {
   uint32_t random_number{static_cast<uint32_t>(rng())};
   int height{std::min(std::countl_zero(random_number) + 1, MAX_HEIGHT)};
@@ -140,7 +122,8 @@ int Memtable::random_height() {
 
 std::vector<Memtable::Record> Memtable::linear_iteration() {
   Node *temp{top};
-  std::vector<Record> records(total_node_count);
+  std::vector<Record> records{};
+  records.reserve(total_node_count);
   Record record{};
 
   while (temp->forward_list[0]) {
@@ -148,6 +131,8 @@ std::vector<Memtable::Record> Memtable::linear_iteration() {
     record.value = temp->forward_list[0]->value;
     record.op = temp->forward_list[0]->op;
     records.push_back(record);
+
+    temp = temp->forward_list[0];
   }
 
   return records;
