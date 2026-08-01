@@ -16,6 +16,7 @@ private:
   Node *search_for_node(const std::vector<std::byte> &key,
                         std::vector<Node *> &update);
   int random_height();
+  static std::string to_str(std::vector<std::byte> bytes);
 
 public:
   struct Record {

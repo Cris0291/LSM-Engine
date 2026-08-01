@@ -26,6 +26,24 @@ TEST(MemtableTest, CompareEqualBytesReflexiveProperty) {
   EXPECT_EQ(res, 0);
 };
 
+TEST(MemtableTest, CompareLessAndGreater) {
+  // Arrange
+  std::string key1{"apple"};
+  std::string key2{"banana"};
+  std::string key3{"elderberry"};
+  std::vector<std::byte> bytes_key1{bytes(key1)};
+  std::vector<std::byte> bytes_key2{bytes(key2)};
+  std::vector<std::byte> bytes_key3{bytes(key3)};
+
+  // Act
+  int res{compare_bytes(bytes_key1, bytes_key2)};
+  int res1{compare_bytes(bytes_key3, bytes_key1)};
+
+  // Assert
+  EXPECT_TRUE(res < 0);
+  EXPECT_TRUE(res1 > 0);
+};
+
 TEST(MemtableTest, CompareAntisymmetricProperty) {
   // Arrange
   std::string lex_less{"ab"};
@@ -119,11 +137,13 @@ TEST(MemtableTest, MemtableSortedOrder) {
   auto res{memtable.linear_iteration()};
 
   // Assert
-  EXPECT_EQ(res[0].key, bytes_key1);
-  EXPECT_EQ(res[1].key, bytes_key2);
-  EXPECT_EQ(res[2].key, bytes_key3);
-  EXPECT_EQ(res[3].key, bytes_key4);
-  EXPECT_EQ(res[4].key, bytes_key5);
-  EXPECT_EQ(res[5].key, bytes_key6);
-  EXPECT_EQ(res[6].key, bytes_key7);
+  EXPECT_EQ(res[0].key, bytes_key6);
+  EXPECT_EQ(res[1].key, bytes_key7);
+  EXPECT_EQ(res[2].key, bytes_key1);
+  EXPECT_EQ(res[3].key, bytes_key2);
+  EXPECT_EQ(res[4].key, bytes_key3);
+  EXPECT_EQ(res[5].key, bytes_key4);
+  EXPECT_EQ(res[6].key, bytes_key5);
+
+  EXPECT_EQ(res.size(), 7);
 };

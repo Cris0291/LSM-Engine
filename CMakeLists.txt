@@ -18,7 +18,7 @@ target_link_libraries(wal_lib PUBLIC record_codec)
 add_library(utility INTERFACE)
 target_include_directories(utility INTERFACE src/utility)
 
-add_library(memtable_lib src/memtable/memtable.cpp)
+add_library(memtable_lib src/memtable/memtable.cpp src/memtable/node.cpp)
 target_include_directories(memtable_lib PUBLIC src/memtable)
 target_link_libraries(memtable_lib PUBLIC record_codec)
 target_link_libraries(memtable_lib PUBLIC utility)

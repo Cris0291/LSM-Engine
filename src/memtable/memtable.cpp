@@ -2,6 +2,7 @@
 #include "lsm_utilities.h"
 #include <algorithm>
 #include <bit>
+#include <iostream>
 
 Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
   Node *node{new Node(MAX_HEIGHT)};
@@ -23,15 +24,22 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
     }
     comparison_res = compare_bytes(temp->forward_list[temp_level]->key, key);
     // Horizontal path if value is less
+    std::cerr << "search " << "level= " << temp_level << "node key "
+              << to_str(temp->forward_list[temp_level]->key) << "node value"
+              << to_str(temp->forward_list[temp_level]->value)
+              << "cmp= " << comparison_res << "\n";
     if (comparison_res < 0) {
       temp = temp->forward_list[temp_level];
+      std::cerr << "RIGHT " << "node key" << "\n";
       continue;
     } else if (comparison_res > 0) {
       // Vertical path if value is greater
       update[temp_level] = temp;
       temp_level -= 1;
+      std::cerr << "DOWN" << temp_level << "\n";
       continue;
     } else {
+      std::cerr << "FOUND" << "\n";
       res = temp->forward_list[temp_level];
       break;
     }
@@ -40,16 +48,26 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
   if (res)
     return res;
 
+  update[0] = update[1];
   // lineal search over the level 0
   while (temp->forward_list[temp_level]) {
     comparison_res = compare_bytes(temp->forward_list[temp_level]->key, key);
+    std::cerr << "search linear" << "level= " << temp_level << "node key "
+              << to_str(temp->forward_list[temp_level]->key) << "node value"
+              << to_str(temp->forward_list[temp_level]->value)
+              << "cmp= " << comparison_res << "\n";
     if (comparison_res < 0) {
       temp = temp->forward_list[temp_level];
+      update[temp_level] = temp;
+      std::cerr << "LINEAR RIGHT " << "\n";
+
       continue;
     } else if (comparison_res > 0) {
       update[temp_level] = temp;
+      std::cerr << "DOWN" << temp_level << "\n";
       break;
     } else {
+      std::cerr << "FOUND" << "\n";
       return temp->forward_list[temp_level];
     }
   }
@@ -96,9 +114,12 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
       break;
 
     temp = update[i];
+    std::cerr << "insert update " << to_str(temp->key) << "\n";
     after = temp->forward_list[curr_level];
     temp->forward_list[curr_level] = node;
     node->forward_list[curr_level] = after;
+    std::cerr << "insert " << "curr level " << curr_level << to_str(node->key)
+              << "\n";
     curr_level += 1;
   }
 
@@ -145,4 +166,15 @@ Memtable::~Memtable() {
     delete top;
     top = temp;
   }
+};
+
+std::string Memtable::to_str(std::vector<std::byte> bytes) {
+  std::string s;
+  s.reserve(bytes.size());
+
+  for (auto byte : bytes) {
+    s.push_back(static_cast<char>(byte));
+  }
+
+  return s;
 };
