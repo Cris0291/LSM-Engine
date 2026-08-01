@@ -1,8 +1,11 @@
 #include "lsm_utilities.h"
 #include "memtable.h"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <gtest/gtest.h>
+#include <random>
 #include <string>
 
 static std::vector<std::byte> bytes(const std::string &s) {
@@ -107,7 +110,7 @@ TEST(MemtableTest, CompareEmpty) {
 
 TEST(MemtableTest, MemtableSortedOrder) {
   // Arrange
-  std::uint32_t seed{42};
+  std::uint32_t seed{1042};
   Memtable memtable{seed};
   std::string key1{"apple"};
   std::string key2{"banana"};
@@ -146,4 +149,74 @@ TEST(MemtableTest, MemtableSortedOrder) {
   EXPECT_EQ(res[6].key, bytes_key5);
 
   EXPECT_EQ(res.size(), 7);
+};
+
+TEST(MemtableTest, SearchKey) {
+  // Arrange
+  std::uint32_t seed{1000};
+  Memtable memtable{seed};
+  std::string key1{"apple"};
+  auto bytes_key1{bytes(key1)};
+
+  // Act
+  memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
+  Node *node{memtable.search(bytes_key1)};
+  // Assert
+  EXPECT_TRUE(node != nullptr);
+  EXPECT_EQ(bytes_key1, node->key);
+};
+
+TEST(MemtableTest, SearchKeyAndNotFoundKey) {
+  // Arrange
+  std::uint32_t seed{1000};
+  Memtable memtable{seed};
+
+  std::string key1{"apple"};
+  std::string key2{"banana"};
+
+  auto bytes_key1{bytes(key1)};
+  auto bytes_key2{bytes(key2)};
+
+  // Act
+  memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
+  Node *node{memtable.search(bytes_key1)};
+  Node *node1{memtable.search(bytes_key2)};
+
+  // Assert
+  EXPECT_TRUE(node != nullptr);
+  EXPECT_EQ(bytes_key1, node->key);
+  EXPECT_TRUE(node1 == nullptr);
+};
+
+TEST(MemtableTest, MultiLevelStressTest) {
+  // Arrange
+  const int max_keys{1000};
+  const std::uint32_t seed{1000000};
+  Memtable memtable{seed};
+  std::vector<std::vector<std::byte>> keys_ordered;
+  std::vector<std::vector<std::byte>> keys_shuffled;
+  keys_ordered.reserve(max_keys);
+  keys_shuffled.reserve(max_keys);
+
+  for (int i{}; i < max_keys; i++) {
+    std::string key = std::format("key_{:03d}", i);
+    std::vector<std::byte> key_byte{bytes(key)};
+    keys_ordered.push_back(std::move(key_byte));
+  }
+
+  std::mt19937 generator(seed);
+  keys_shuffled = keys_ordered;
+  std::shuffle(keys_shuffled.begin(), keys_shuffled.end(), generator);
+
+  // Act
+  for (auto key : keys_shuffled) {
+    memtable.insert(key, key, OperationRecord::PUT, false);
+  }
+
+  // Assert
+  auto records{memtable.linear_iteration()};
+
+  for (int i{}; i < records.size(); i++) {
+    EXPECT_EQ(keys_ordered[i], records[i].key);
+  }
 };
