@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <format>
 #include <gtest/gtest.h>
+#include <optional>
 #include <random>
 #include <string>
 
@@ -160,9 +161,9 @@ TEST(MemtableTest, SearchKey) {
 
   // Act
   memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
-  Node *node{memtable.search(bytes_key1)};
+  std::optional<Memtable::Record> node{memtable.search(bytes_key1)};
   // Assert
-  EXPECT_TRUE(node != nullptr);
+  EXPECT_TRUE(node.has_value());
   EXPECT_EQ(bytes_key1, node->key);
 };
 
@@ -179,13 +180,13 @@ TEST(MemtableTest, SearchKeyAndNotFoundKey) {
 
   // Act
   memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
-  Node *node{memtable.search(bytes_key1)};
-  Node *node1{memtable.search(bytes_key2)};
+  std::optional<Memtable::Record> node{memtable.search(bytes_key1)};
+  std::optional<Memtable::Record> node1{memtable.search(bytes_key2)};
 
   // Assert
-  EXPECT_TRUE(node != nullptr);
+  EXPECT_TRUE(node.has_value());
   EXPECT_EQ(bytes_key1, node->key);
-  EXPECT_TRUE(node1 == nullptr);
+  EXPECT_TRUE(!node1.has_value());
 };
 
 TEST(MemtableTest, MultiLevelStressTest) {
@@ -219,4 +220,61 @@ TEST(MemtableTest, MultiLevelStressTest) {
   for (int i{}; i < records.size(); i++) {
     EXPECT_EQ(keys_ordered[i], records[i].key);
   }
+};
+
+TEST(MemtableTest, InsertOverrideValue) {
+  // Arrange
+  std::uint32_t seed{1042};
+  Memtable memtable{seed};
+  std::string key1{"apple"};
+  std::string key2{"banana"};
+  std::string key3{"cherry"};
+  std::string key4{"date"};
+
+  auto bytes_key1{bytes(key1)};
+  auto bytes_key2{bytes(key2)};
+  auto bytes_key3{bytes(key3)};
+  auto bytes_key4{bytes(key4)};
+
+  // Act
+  memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
+  memtable.insert(bytes_key2, bytes_key2, OperationRecord::PUT, false);
+  memtable.insert(bytes_key3, bytes_key3, OperationRecord::PUT, false);
+
+  std::optional<Memtable::Record> node_key1{memtable.search(bytes_key1)};
+  auto records{memtable.linear_iteration()};
+
+  memtable.insert(bytes_key1, bytes_key4, OperationRecord::PUT, false);
+
+  std::optional<Memtable::Record> node_key1_updated{
+      memtable.search(bytes_key1)};
+  auto records_updated{memtable.linear_iteration()};
+
+  // Arrange
+  EXPECT_EQ(node_key1->value, bytes_key1);
+  EXPECT_EQ(node_key1_updated->value, bytes_key4);
+  EXPECT_EQ(records.size(), records_updated.size());
+};
+
+TEST(MemtableTest, DeleteNode) {
+  // Arrange
+  std::uint32_t seed{1042};
+  Memtable memtable{seed};
+  std::string key1{"apple"};
+
+  auto bytes_key1{bytes(key1)};
+
+  // Act
+  memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
+  std::optional<Memtable::Record> node_key1{memtable.search(bytes_key1)};
+
+  memtable.delete_node(bytes_key1);
+  std::optional<Memtable::Record> node_key1_deleted{
+      memtable.search(bytes_key1)};
+
+  // Assert
+  EXPECT_EQ(node_key1->key, bytes_key1);
+  EXPECT_EQ(node_key1_deleted->key, bytes_key1);
+  EXPECT_EQ(node_key1->op, OperationRecord::PUT);
+  EXPECT_EQ(node_key1_deleted->op, OperationRecord::DELETE);
 };

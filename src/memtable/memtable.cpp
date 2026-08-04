@@ -61,14 +61,14 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
   return res;
 };
 
-Node *Memtable::search(std::vector<std::byte> key) {
+std::optional<Memtable::Record> Memtable::search(std::vector<std::byte> key) {
   std::vector<Node *> update(MAX_HEIGHT, top);
   Node *res{search_for_node(key, update)};
 
   if (res)
-    return res;
+    return copy_node_to_record(res);
 
-  return nullptr;
+  return {};
 };
 
 void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
@@ -161,4 +161,9 @@ std::string Memtable::to_str(std::vector<std::byte> bytes) {
   }
 
   return s;
+};
+
+Memtable::Record Memtable::copy_node_to_record(Node *node) {
+  Record record{node->key, node->value, node->op};
+  return record;
 };
