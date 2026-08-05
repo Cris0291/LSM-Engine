@@ -278,3 +278,21 @@ TEST(MemtableTest, DeleteNode) {
   EXPECT_EQ(node_key1->op, OperationRecord::PUT);
   EXPECT_EQ(node_key1_deleted->op, OperationRecord::DELETE);
 };
+
+TEST(MemtableTest, DeleteNonExistingNode) {
+  // Arrange
+  std::uint32_t seed{1042};
+  Memtable memtable{seed};
+  std::string key1{"apple"};
+
+  auto bytes_key1{bytes(key1)};
+
+  // Act
+  memtable.delete_node(bytes_key1);
+  std::optional<Memtable::Record> node_key1_deleted{
+      memtable.search(bytes_key1)};
+
+  // Assert
+  EXPECT_EQ(node_key1_deleted->key, bytes_key1);
+  EXPECT_EQ(node_key1_deleted->op, OperationRecord::DELETE);
+}
