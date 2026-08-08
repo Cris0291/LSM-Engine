@@ -1,11 +1,17 @@
+#pragma once
+
 #include "memtable.h"
+#include <cstddef>
+#include <string>
+#include <vector>
 
 class Sstable {
 private:
-  Memtable &memtable;
+  static constexpr std::size_t FOOTER_SIZE{20};
+  int fd;
+  std::size_t file_size;
 
 public:
-  Sstable(Memtable &memtable);
-  void write();
-  void read();
+  Sstable(std::string path);
+  Memtable::Record read(std::vector<std::byte> key);
 };
