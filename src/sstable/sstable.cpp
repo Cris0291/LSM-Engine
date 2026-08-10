@@ -1,5 +1,7 @@
 #include "sstable.h"
 #include "lsm_utilities.h"
+#include "memtable.h"
+#include "sstable_operation.h"
 #include <cstddef>
 #include <cstdint>
 #include <fcntl.h>
@@ -26,7 +28,7 @@ Sstable::Sstable(std::string path) {
   file_size = file_info.st_size;
 };
 
-Memtable::Record Sstable::read(std::vector<std::byte> key) {
+std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
   std::size_t footer_offset{file_size - FOOTER_SIZE};
   std::vector<std::byte> footer{};
   std::size_t footer_res{};
@@ -67,6 +69,9 @@ Memtable::Record Sstable::read(std::vector<std::byte> key) {
     throw std::runtime_error(
         "something went wrong while reading the data block");
   }
+
+  auto record_res{search_records(records, key)};
+  return record_res;
 };
 
 std::vector<IndexEntry> Sstable::parse_index(std::vector<std::byte> &index) {
@@ -119,10 +124,12 @@ std::size_t Sstable::search_entry(const std::vector<IndexEntry> &entries,
   return res;
 };
 
-void Sstable::search_records(std::vector<std::byte> &records) {
+std::optional<RecordSstable>
+Sstable::search_records(std::vector<std::byte> &records,
+                        std::span<std::byte> key) {
   std::size_t curr_size{12};
   std::size_t op_size{1};
-  std::size_t value_size{4};
+  std::size_t key_value_size{4};
   std::uint32_t crc{from_n_bytes_little_endian<std::uint32_t, 4>(
       std::span<std::byte>{records}.subspan(0, 4))};
   std::uint32_t block_size{from_n_bytes_little_endian<std::uint32_t, 4>(
@@ -130,8 +137,50 @@ void Sstable::search_records(std::vector<std::byte> &records) {
   std::uint32_t record_count{from_n_bytes_little_endian<std::uint32_t, 4>(
       std::span<std::byte>{records}.subspan(8, 4))};
 
+  OperationRecord op{};
+  std::uint32_t key_len{};
+  std::uint32_t value_len{};
+  int comparison_res{-1};
+
+  std::size_t record_offset{};
+
   while (curr_size < block_size) {
+    record_offset = curr_size;
+
+    curr_size += op_size;
+    key_len = from_n_bytes_little_endian<std::uint32_t, 4>(
+        std::span<std::byte>{records}.subspan(curr_size, key_value_size));
+    curr_size += key_value_size;
+    value_len = from_n_bytes_little_endian<std::uint32_t, 4>(
+        std::span<std::byte>{records}.subspan(curr_size, key_value_size));
+    curr_size += key_value_size;
+    std::span<std::byte> record_key{
+        std::span<std::byte>{records}.subspan(curr_size, key_len)};
+
+    comparison_res = compare_bytes(record_key, key);
+    curr_size += key_len;
+    curr_size += value_len;
+
+    if (comparison_res == 0)
+      break;
   }
+
+  if (comparison_res == 0) {
+    RecordSstable record{};
+    record.op = static_cast<OperationRecord>(records[record_offset]);
+    record_offset += op_size;
+    record_offset += key_value_size * 2;
+    record.key =
+        std::vector<std::byte>(records.begin() + record_offset,
+                               records.begin() + record_offset + key_len);
+    record_offset += key_len;
+    record.value =
+        std::vector<std::byte>(records.begin() + record_offset,
+                               records.begin() + record_offset + value_len);
+    return record;
+  }
+
+  return {};
 };
 
 ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,

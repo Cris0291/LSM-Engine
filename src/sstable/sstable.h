@@ -1,8 +1,8 @@
 #pragma once
 
-#include "memtable.h"
 #include "sstable_operation.h"
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -27,9 +27,10 @@ private:
   std::vector<IndexEntry> parse_index(std::vector<std::byte> &index);
   std::size_t search_entry(const std::vector<IndexEntry> &entries,
                            const std::vector<std::byte> &key);
-  void search_records(std::vector<std::byte> &records);
+  std::optional<RecordSstable> search_records(std::vector<std::byte> &records,
+                                              std::span<std::byte> key);
 
 public:
   Sstable(std::string path);
-  Memtable::Record read(std::vector<std::byte> key);
+  std::optional<RecordSstable> read(std::vector<std::byte> key);
 };
