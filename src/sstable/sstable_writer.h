@@ -13,7 +13,7 @@ private:
   int fd;
   void create_data_blocks(std::vector<Memtable::Record> &records,
                           std::vector<std::vector<std::byte>> &data_blocks);
-  void to_4_bytes_little_endian(std::size_t value, std::size_t offset,
+  void to_4_bytes_little_endian(std::size_t value,
                                 std::vector<std::byte> &bytes);
 
 public:

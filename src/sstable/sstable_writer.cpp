@@ -1,4 +1,5 @@
 #include "sstable_writer.h"
+#include "zlib.h"
 #include <algorithm>
 #include <fcntl.h>
 #include <stdexcept>
@@ -14,26 +15,31 @@ void SstableWriter::create_data_blocks(
     std::vector<Memtable::Record> &records,
     std::vector<std::vector<std::byte>> &data_blocks) {
   std::size_t curr_pos{HEADER_SIZE};
-  std::vector<std::byte> buffer(BUFFER_SIZE * 2);
+  std::vector<std::byte> buffer;
+  buffer.reserve(BUFFER_SIZE);
+  buffer.resize(HEADER_SIZE);
 
   for (int i{}; i < records.size(); i++) {
     if (curr_pos >= BUFFER_SIZE) {
-      buffer.resize(curr_pos);
-      data_blocks.push_back(std::move(buffer));
-      buffer.clear();
-      buffer.resize(BUFFER_SIZE * 2);
+      uLong crc{crc32(0L, Z_NULL, 0)};
+      auto starting_pos{buffer.data() + HEADER_SIZE};
+      crc = crc32(crc, reinterpret_cast<const unsigned char *>(starting_pos),
+                  static_cast<uInt>(buffer.size() - HEADER_SIZE));
+
+      data_blocks.emplace_back(std::move(buffer));
+      buffer.reserve(BUFFER_SIZE);
+      buffer.resize(HEADER_SIZE);
     }
-    buffer[curr_pos] = static_cast<std::byte>(records[i].op);
+    buffer.push_back(static_cast<std::byte>(records[i].op));
     curr_pos += OP_SIZE;
-    to_4_bytes_little_endian(records[i].key.size(), curr_pos, buffer);
+    to_4_bytes_little_endian(records[i].key.size(), buffer);
     curr_pos += KEY_SIZE;
-    to_4_bytes_little_endian(records[i].value.size(), curr_pos, buffer);
+    to_4_bytes_little_endian(records[i].value.size(), buffer);
     curr_pos += VALUE_SIZE;
-    std::copy(records[i].key.begin(), records[i].key.end(),
-              buffer.begin() + curr_pos);
+    buffer.insert(buffer.end(), records[i].key.begin(), records[i].key.end());
     curr_pos += records[i].key.size();
-    std::copy(records[i].value.begin(), records[i].value.end(),
-              buffer.begin() + curr_pos);
+    buffer.insert(buffer.end(), records[i].value.begin(),
+                  records[i].value.end());
     curr_pos += records[i].value.size();
   }
 };
@@ -45,15 +51,20 @@ void SstableWriter::flush_memtable(Memtable &memtable) {
 };
 
 void SstableWriter::to_4_bytes_little_endian(std::size_t value,
-                                             std::size_t offset,
                                              std::vector<std::byte> &bytes) {
   std::uint32_t value32{static_cast<std::uint32_t>(value)};
 
-  bytes[offset] = static_cast<std::byte>(value32 & 0xFF);
-  offset += 1;
-  bytes[offset] = static_cast<std::byte>((value32 >> 8) & 0xFF);
-  offset += 1;
-  bytes[offset] = static_cast<std::byte>((value32 >> 16) & 0xFF);
-  offset += 1;
-  bytes[offset] = static_cast<std::byte>((value32 >> 24) & 0xFF);
+  bytes.push_back(static_cast<std::byte>(value32 & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value32 >> 8) & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value32 >> 16) & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value32 >> 24) & 0xFF));
+};
+
+void SstableWriter::to_4_bytes_little_endian(
+    std::size_t value, std::array<std::uint8_t, 4> &bytes) {
+  std::uint32_t val32{static_cast<std::uint32_t>(value)};
+  bytes[0] = static_cast<std::uint8_t>(val32 & 0xFF);
+  bytes[1] = static_cast<std::uint8_t>((val32 >> 8) & 0xFF);
+  bytes[2] = static_cast<std::uint8_t>((val32 >> 16) & 0xFF);
+  bytes[3] = static_cast<std::uint8_t>((val32) >> 24);
 };
