@@ -1,6 +1,9 @@
 #include "memtable.h"
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <tuple>
 #include <vector>
 
 class SstableWriter {
@@ -10,11 +13,21 @@ private:
   static constexpr std::size_t OP_SIZE{1};
   static constexpr std::size_t KEY_SIZE{4};
   static constexpr std::size_t VALUE_SIZE{4};
+  static constexpr std::size_t CRC_SIZE{4};
+  static constexpr std::size_t BLOCK_SIZE{4};
   int fd;
-  void create_data_blocks(std::vector<Memtable::Record> &records,
-                          std::vector<std::vector<std::byte>> &data_blocks);
+  void create_blocks(
+      std::vector<Memtable::Record> &records,
+      std::vector<std::vector<std::byte>> &data_blocks,
+      std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
+          &index_blocks);
   void to_4_bytes_little_endian(std::size_t value,
                                 std::vector<std::byte> &bytes);
+  void to_4_bytes_little_endian(std::size_t value,
+                                std::array<std::uint8_t, 4> &bytes);
+  void set_header(std::size_t size, std::size_t num_records,
+                  std::vector<std::byte> &buffer,
+                  std::vector<std::vector<std::byte>> &data_blocks);
 
 public:
   SstableWriter(std::string path);
