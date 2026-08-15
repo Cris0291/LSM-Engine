@@ -48,7 +48,10 @@ void SstableWriter::create_blocks(
     }
 
     if (curr_size >= BUFFER_SIZE) {
-      set_header(curr_size, record_count, buffer, data_blocks);
+      set_header(curr_size, record_count, buffer);
+      data_blocks.emplace_back(std::move(buffer));
+      buffer.reserve(BUFFER_SIZE);
+      buffer.resize(HEADER_SIZE);
 
       std::get<0>(index) = (!is_first_offset ? curr_size : 0);
       index_blocks.push_back(std::move(index));
@@ -58,6 +61,14 @@ void SstableWriter::create_blocks(
       record_count = 0;
       curr_size = HEADER_SIZE;
     }
+  }
+
+  if (buffer.size() > HEADER_SIZE) {
+    set_header(curr_size, record_count, buffer);
+    data_blocks.emplace_back(std::move(buffer));
+
+    std::get<0>(index) = curr_size;
+    index_blocks.push_back(std::move(index));
   }
 };
 
@@ -86,9 +97,8 @@ void SstableWriter::to_4_bytes_little_endian(
   bytes[3] = static_cast<std::uint8_t>((val32) >> 24);
 };
 
-void SstableWriter::set_header(
-    std::size_t size, std::size_t num_records, std::vector<std::byte> &buffer,
-    std::vector<std::vector<std::byte>> &data_blocks) {
+void SstableWriter::set_header(std::size_t size, std::size_t num_records,
+                               std::vector<std::byte> &buffer) {
   uLong crc{crc32(0L, Z_NULL, 0)};
   auto starting_pos{buffer.data() + HEADER_SIZE};
   crc = crc32(crc, reinterpret_cast<const unsigned char *>(starting_pos),
@@ -107,8 +117,4 @@ void SstableWriter::set_header(
   auto start_pos{buffer.data() + (CRC_SIZE + BLOCK_SIZE)};
   memcpy(start_pos, arr_record_count_bytes.data(),
          arr_record_count_bytes.size());
-
-  data_blocks.emplace_back(std::move(buffer));
-  buffer.reserve(BUFFER_SIZE);
-  buffer.resize(HEADER_SIZE);
 };

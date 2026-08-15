@@ -26,8 +26,7 @@ private:
   void to_4_bytes_little_endian(std::size_t value,
                                 std::array<std::uint8_t, 4> &bytes);
   void set_header(std::size_t size, std::size_t num_records,
-                  std::vector<std::byte> &buffer,
-                  std::vector<std::vector<std::byte>> &data_blocks);
+                  std::vector<std::byte> &buffer);
 
 public:
   SstableWriter(std::string path);
