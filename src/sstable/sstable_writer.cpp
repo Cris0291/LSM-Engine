@@ -1,6 +1,6 @@
 #include "sstable_writer.h"
 #include "zlib.h"
-#include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <fcntl.h>
 #include <stdexcept>
@@ -24,7 +24,6 @@ void SstableWriter::create_blocks(
   std::tuple<std::size_t, std::size_t, std::vector<std::byte>> index;
   std::size_t record_count{};
   bool is_first_record{true};
-  int is_first_offset{true};
 
   for (auto record : records) {
 
@@ -53,10 +52,8 @@ void SstableWriter::create_blocks(
       buffer.reserve(BUFFER_SIZE);
       buffer.resize(HEADER_SIZE);
 
-      std::get<0>(index) = (!is_first_offset ? curr_size : 0);
+      std::get<0>(index) = curr_size;
       index_blocks.push_back(std::move(index));
-      is_first_record = true;
-      is_first_offset = false;
 
       record_count = 0;
       curr_size = HEADER_SIZE;
@@ -72,10 +69,40 @@ void SstableWriter::create_blocks(
   }
 };
 
+std::size_t SstableWriter::create_index(
+    std::vector<std::vector<std::byte>> &index,
+    std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
+        &index_blocks) {
+  std::vector<std::byte> buffer;
+  std::size_t accumulation_offset{};
+  std::size_t total_size{};
+
+  for (int i{}; i < index_blocks.size(); i++) {
+    std::size_t offset{std::get<0>(index_blocks[i])};
+    to_8_bytes_little_endian(accumulation_offset, buffer);
+
+    std::size_t key_len{std::get<1>(index_blocks[i])};
+    to_4_bytes_little_endian(key_len, buffer);
+
+    std::vector<std::byte> &key{std::get<2>(index_blocks[i])};
+    buffer.insert(buffer.end(), key.begin(), key.end());
+
+    accumulation_offset += offset;
+  }
+
+  return accumulation_offset;
+};
+
 void SstableWriter::flush_memtable(Memtable &memtable) {
   std::vector<Memtable::Record> records{memtable.linear_iteration()};
 
-  std::vector<std::byte> buffer(BUFFER_SIZE);
+  std::vector<std::vector<std::byte>> data_blocks;
+  std::vector<std::vector<std::byte>> index;
+  std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
+      index_blocks;
+
+  create_blocks(records, data_blocks, index_blocks);
+  std::size_t footer_offset{create_index(index, index_blocks)};
 };
 
 void SstableWriter::to_4_bytes_little_endian(std::size_t value,
@@ -86,6 +113,19 @@ void SstableWriter::to_4_bytes_little_endian(std::size_t value,
   bytes.push_back(static_cast<std::byte>((value32 >> 8) & 0xFF));
   bytes.push_back(static_cast<std::byte>((value32 >> 16) & 0xFF));
   bytes.push_back(static_cast<std::byte>((value32 >> 24) & 0xFF));
+};
+
+void SstableWriter::to_8_bytes_little_endian(std::int64_t value64,
+                                             std::vector<std::byte> &bytes) {
+
+  bytes.push_back(static_cast<std::byte>(value64 & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value64 >> 8) & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value64 >> 16) & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value64 >> 24) & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value64 >> 32) & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value64 >> 40) & 0xFF));
+  bytes.push_back(static_cast<std::byte>((value64 >> 48) & 0xFF));
+  bytes.push_back(static_cast<std::byte>(value64 >> 56));
 };
 
 void SstableWriter::to_4_bytes_little_endian(
