@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 class SstableWriter {
@@ -15,7 +16,10 @@ private:
   static constexpr std::size_t VALUE_SIZE{4};
   static constexpr std::size_t CRC_SIZE{4};
   static constexpr std::size_t BLOCK_SIZE{4};
+  static constexpr std::size_t INDEX_OFFSET{4};
+  static constexpr std::uint32_t MAGIC{'SST1'};
   int fd;
+  std::string dir_path;
   void create_blocks(
       std::vector<Memtable::Record> &records,
       std::vector<std::vector<std::byte>> &data_blocks,
@@ -29,10 +33,13 @@ private:
                                 std::array<std::uint8_t, 4> &bytes);
   void set_header(std::size_t size, std::size_t num_records,
                   std::vector<std::byte> &buffer);
-  std::size_t create_index(
+  std::pair<std::uint64_t, std::uint64_t> create_index(
       std::vector<std::vector<std::byte>> &index,
       std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
           &index_blocks);
+  void write_sstable(std::vector<std::vector<std::byte>> &data,
+                     std::vector<std::vector<std::byte>> &index,
+                     std::vector<std::byte> &footer);
 
 public:
   SstableWriter(std::string path);

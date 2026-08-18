@@ -1,15 +1,22 @@
 #include "sstable_writer.h"
 #include "zlib.h"
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <fcntl.h>
+#include <filesystem>
 #include <stdexcept>
+#include <sys/uio.h>
+#include <unistd.h>
 
 SstableWriter::SstableWriter(std::string path) {
   fd = open(path.data(), O_RDWR | O_CREAT | O_TRUNC, 0644);
   if (fd == -1) {
     throw std::runtime_error("could not create the file for sstable write");
   }
+
+  std::filesystem::path p{path};
+  dir_path = p.parent_path().string();
 };
 
 void SstableWriter::create_blocks(
@@ -25,7 +32,7 @@ void SstableWriter::create_blocks(
   std::size_t record_count{};
   bool is_first_record{true};
 
-  for (auto record : records) {
+  for (auto &record : records) {
 
     buffer.push_back(static_cast<std::byte>(record.op));
     curr_size += OP_SIZE;
@@ -69,28 +76,66 @@ void SstableWriter::create_blocks(
   }
 };
 
-std::size_t SstableWriter::create_index(
+std::pair<std::uint64_t, std::uint64_t> SstableWriter::create_index(
     std::vector<std::vector<std::byte>> &index,
     std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
         &index_blocks) {
   std::vector<std::byte> buffer;
-  std::size_t accumulation_offset{};
-  std::size_t total_size{};
+  std::uint64_t accumulation_offset{};
+  std::uint64_t total_size{};
 
   for (int i{}; i < index_blocks.size(); i++) {
     std::size_t offset{std::get<0>(index_blocks[i])};
     to_8_bytes_little_endian(accumulation_offset, buffer);
+    total_size += INDEX_OFFSET;
 
     std::size_t key_len{std::get<1>(index_blocks[i])};
     to_4_bytes_little_endian(key_len, buffer);
+    total_size += KEY_SIZE;
 
     std::vector<std::byte> &key{std::get<2>(index_blocks[i])};
     buffer.insert(buffer.end(), key.begin(), key.end());
+    total_size += key_len;
 
     accumulation_offset += offset;
   }
 
-  return accumulation_offset;
+  return {accumulation_offset, total_size};
+};
+
+void SstableWriter::write_sstable(std::vector<std::vector<std::byte>> &data,
+                                  std::vector<std::vector<std::byte>> &index,
+                                  std::vector<std::byte> &footer) {
+  std::vector<iovec> iovecs;
+  long max_iovecs{sysconf(_SC_IOV_MAX)};
+  std::size_t written_size{};
+
+  for (auto &block : data) {
+    iovecs.push_back({.iov_base = block.data(), .iov_len = block.size()});
+  }
+
+  for (auto &block : index) {
+    iovecs.push_back({.iov_base = block.data(), .iov_len = block.size()});
+  }
+
+  iovecs.push_back({.iov_base = footer.data(), .iov_len = footer.size()});
+
+  if (iovecs.size() > max_iovecs) {
+    for (; written_size < iovecs.size(); written_size += max_iovecs) {
+      writev(fd, iovecs.data() + written_size, max_iovecs);
+      if ((iovecs.size() - written_size) < max_iovecs) {
+        break;
+      }
+    }
+
+    if (written_size < iovecs.size()) {
+      writev(fd, iovecs.data() + written_size, iovecs.size() - written_size);
+    }
+  } else {
+    writev(fd, iovecs.data(), iovecs.size());
+  }
+
+  fsync(fd);
 };
 
 void SstableWriter::flush_memtable(Memtable &memtable) {
@@ -100,9 +145,19 @@ void SstableWriter::flush_memtable(Memtable &memtable) {
   std::vector<std::vector<std::byte>> index;
   std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
       index_blocks;
+  std::vector<std::byte> footer;
 
   create_blocks(records, data_blocks, index_blocks);
-  std::size_t footer_offset{create_index(index, index_blocks)};
+  auto index_res{create_index(index, index_blocks)};
+
+  std::uint64_t index_offset{index_res.first};
+  std::uint64_t index_size{index_res.second};
+
+  to_8_bytes_little_endian(index_offset, footer);
+  to_8_bytes_little_endian(index_size, footer);
+  to_4_bytes_little_endian(MAGIC, footer);
+
+  write_sstable(data_blocks, index, footer);
 };
 
 void SstableWriter::to_4_bytes_little_endian(std::size_t value,
