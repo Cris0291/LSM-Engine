@@ -23,6 +23,11 @@ target_include_directories(memtable_lib PUBLIC src/memtable)
 target_link_libraries(memtable_lib PUBLIC record_codec)
 target_link_libraries(memtable_lib PUBLIC utility)
 
+add_library(sstable_lib src/sstable/sstable.cpp src/sstable/sstable_eriter.cpp)
+target_include_directories(sstable_lib PUBLIC src/sstable)
+target_link_libraries(sstable_lib PUBLIC memtable_lib)
+target_link_libraries(sstable_lib PUBLIC ZLIB::ZLIB)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -42,6 +47,9 @@ target_link_libraries(wal_tests PRIVATE record_codec wal_lib GTest::gtest_main)
 
 add_executable(memtable_tests tests/test_memtable.cpp)
 target_link_libraries(memtable_tests PRIVATE record_codec memtable_lib utility GTest::gtest_main)
+
+add_executable(sstable_tests tests/test_sstable.cpp)
+target_link_libraries(sstable_tests PRIVATE  sstable_lib memtable_lib GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(codec_tests)
