@@ -4,19 +4,26 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
-#include <filesystem>
 #include <stdexcept>
 #include <sys/uio.h>
 #include <unistd.h>
 
-SstableWriter::SstableWriter(std::string path) {
+SstableWriter::SstableWriter(std::string path, std::string dir) {
   fd = open(path.data(), O_RDWR | O_CREAT | O_TRUNC, 0644);
   if (fd == -1) {
     throw std::runtime_error("could not create the file for sstable write");
   }
 
-  std::filesystem::path p{path};
-  dir_path = p.parent_path().string();
+  int dir_fd{open(dir.data(), O_DIRECTORY)};
+  if (fd == -1) {
+    throw std::runtime_error("directory could not be found");
+  }
+
+  if (fsync(dir_fd) == -1) {
+    throw std::runtime_error("error calling fsync");
+  }
+
+  close(dir_fd);
 };
 
 void SstableWriter::create_blocks(

@@ -19,7 +19,6 @@ private:
   static constexpr std::size_t INDEX_OFFSET{4};
   static constexpr std::uint32_t MAGIC{'SST1'};
   int fd;
-  std::string dir_path;
   void create_blocks(
       std::vector<Memtable::Record> &records,
       std::vector<std::vector<std::byte>> &data_blocks,
@@ -42,6 +41,6 @@ private:
                      std::vector<std::byte> &footer);
 
 public:
-  SstableWriter(std::string path);
+  SstableWriter(std::string path, std::string dir);
   void flush_memtable(Memtable &memtable);
 };
