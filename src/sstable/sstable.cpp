@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <utility>
 
 Sstable::Sstable(std::string path) {
   fd = open(path.data(), O_RDONLY);
@@ -26,6 +27,82 @@ Sstable::Sstable(std::string path) {
   }
 
   file_size = file_info.st_size;
+};
+
+Sstable::~Sstable() { close(fd); };
+
+std::vector<RecordSstable> Sstable::linera_iteration() {
+  std::size_t footer_offset{file_size - FOOTER_SIZE};
+  std::vector<std::byte> footer{};
+  std::vector<std::byte> blocks{};
+  std::vector<RecordSstable> res;
+  std::size_t curr_size{};
+  std::size_t block_size_offset{4};
+  std::size_t start_pos{HEADER_SIZE};
+
+  ReadBlockResult footer_op_res{read_block(footer, FOOTER_SIZE, footer_offset)};
+  if (footer_op_res == ReadBlockResult::ERROR) {
+    throw std::runtime_error("something went wrong while reading the footer");
+  }
+
+  std::uint64_t index_size{from_n_bytes_little_endian<std::uint64_t, 8>(
+      std::span<std::byte>{footer}.subspan(8, 8))};
+
+  std::size_t total_file_size{file_size - index_size - FOOTER_SIZE};
+
+  ReadBlockResult blocks_op_res{read_block(blocks, total_file_size, 0)};
+  if (blocks_op_res == ReadBlockResult::ERROR) {
+    throw std::runtime_error(
+        "something went wrong while reading the blocks of the file");
+  }
+
+  while (curr_size < total_file_size) {
+    std::uint32_t block_size_with_header{
+        from_n_bytes_little_endian<std::uint32_t, 4>(
+            std::span<std::byte>{blocks}.subspan(block_size_offset, 4))};
+    std::size_t block_size{block_size_with_header - HEADER_SIZE};
+
+    parse_blocks(blocks, res, block_size, start_pos);
+    curr_size += block_size_with_header;
+    block_size_offset += block_size_with_header;
+    start_pos += block_size_with_header;
+  }
+
+  return res;
+};
+
+void Sstable::parse_blocks(std::vector<std::byte> &records,
+                           std::vector<RecordSstable> parsed_records,
+                           std::size_t size, std::size_t curr_size) {
+  OperationRecord op{};
+  std::uint32_t key_len{};
+  std::uint32_t value_len{};
+  RecordSstable p_record{};
+
+  while (curr_size < size) {
+    op = static_cast<OperationRecord>(records[curr_size]);
+    curr_size += OP_SIZE;
+
+    key_len = from_n_bytes_little_endian<std::uint32_t, 4>(
+        std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
+    curr_size += KEY_VALUE_SIZE;
+
+    value_len = from_n_bytes_little_endian<std::uint32_t, 4>(
+        std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
+    curr_size += KEY_VALUE_SIZE;
+
+    p_record.key = std::vector<std::byte>(
+        records.begin() + curr_size, records.begin() + curr_size + key_len);
+    curr_size += key_len;
+
+    p_record.value = std::vector<std::byte>(
+        records.begin() + curr_size, records.begin() + curr_size + value_len);
+    curr_size += value_len;
+
+    p_record.op = op;
+
+    parsed_records.push_back(std::move(p_record));
+  }
 };
 
 std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
@@ -128,8 +205,6 @@ std::optional<RecordSstable>
 Sstable::search_records(std::vector<std::byte> &records,
                         std::span<std::byte> key) {
   std::size_t curr_size{12};
-  std::size_t op_size{1};
-  std::size_t key_value_size{4};
   std::uint32_t crc{from_n_bytes_little_endian<std::uint32_t, 4>(
       std::span<std::byte>{records}.subspan(0, 4))};
   std::uint32_t block_size{from_n_bytes_little_endian<std::uint32_t, 4>(
@@ -147,13 +222,13 @@ Sstable::search_records(std::vector<std::byte> &records,
   while (curr_size < block_size) {
     record_offset = curr_size;
 
-    curr_size += op_size;
+    curr_size += OP_SIZE;
     key_len = from_n_bytes_little_endian<std::uint32_t, 4>(
-        std::span<std::byte>{records}.subspan(curr_size, key_value_size));
-    curr_size += key_value_size;
+        std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
+    curr_size += KEY_VALUE_SIZE;
     value_len = from_n_bytes_little_endian<std::uint32_t, 4>(
-        std::span<std::byte>{records}.subspan(curr_size, key_value_size));
-    curr_size += key_value_size;
+        std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
+    curr_size += KEY_VALUE_SIZE;
     std::span<std::byte> record_key{
         std::span<std::byte>{records}.subspan(curr_size, key_len)};
 
@@ -168,8 +243,8 @@ Sstable::search_records(std::vector<std::byte> &records,
   if (comparison_res == 0) {
     RecordSstable record{};
     record.op = static_cast<OperationRecord>(records[record_offset]);
-    record_offset += op_size;
-    record_offset += key_value_size * 2;
+    record_offset += OP_SIZE;
+    record_offset += KEY_VALUE_SIZE * 2;
     record.key =
         std::vector<std::byte>(records.begin() + record_offset,
                                records.begin() + record_offset + key_len);

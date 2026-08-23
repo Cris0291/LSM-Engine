@@ -42,5 +42,6 @@ private:
 
 public:
   SstableWriter(std::string path, std::string dir);
+  ~SstableWriter();
   void flush_memtable(Memtable &memtable);
 };

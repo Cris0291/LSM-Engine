@@ -26,6 +26,8 @@ SstableWriter::SstableWriter(std::string path, std::string dir) {
   close(dir_fd);
 };
 
+SstableWriter::~SstableWriter() { close(fd); };
+
 void SstableWriter::create_blocks(
     std::vector<Memtable::Record> &records,
     std::vector<std::vector<std::byte>> &data_blocks,

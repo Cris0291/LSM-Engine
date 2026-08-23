@@ -1,4 +1,6 @@
 #include "memtable.h"
+#include "sstable.h"
+#include "sstable_operation.h"
 #include "sstable_writer.h"
 #include <cstddef>
 #include <cstdint>
@@ -55,5 +57,12 @@ TEST_F(SstableTest, RoundTrip) {
   // Arrange
   SstableWriter sswriter{file_path, dir_path};
   Memtable memtable{create_memtable()};
-  std::vector<Memtable::Record>{memtable.linear_iteration()};
+  std::vector<Memtable::Record> mem_records{memtable.linear_iteration()};
+  sswriter.flush_memtable(memtable);
+  Sstable ssreader{file_path};
+
+  // Act
+  std::vector<RecordSstable> sstable_records{ssreader.linera_iteration()};
+
+  // Assert
 };
