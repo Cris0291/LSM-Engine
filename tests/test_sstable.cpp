@@ -22,6 +22,7 @@ protected:
         fs::temp_directory_path() /
         ("sstable_" + std::to_string(::getppid()) + "_" +
          ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    fs::create_directory(dir_path);
     file_path = dir_path / "test.sst";
   }
   void TearDown() override {
@@ -65,4 +66,10 @@ TEST_F(SstableTest, RoundTrip) {
   std::vector<RecordSstable> sstable_records{ssreader.linera_iteration()};
 
   // Assert
+  EXPECT_EQ(mem_records.size(), sstable_records.size());
+  for (int i{}; i < mem_records.size(); i++) {
+    EXPECT_EQ(mem_records[i].op, sstable_records[i].op);
+    EXPECT_EQ(mem_records[i].key, sstable_records[i].key);
+    EXPECT_EQ(mem_records[i].value, sstable_records[i].value);
+  }
 };

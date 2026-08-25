@@ -33,8 +33,8 @@ private:
   std::optional<RecordSstable> search_records(std::vector<std::byte> &records,
                                               std::span<std::byte> key);
   void parse_blocks(std::vector<std::byte> &records,
-                    std::vector<RecordSstable> parsed_records, std::size_t size,
-                    std::size_t curr_size);
+                    std::vector<RecordSstable> &parsed_records,
+                    std::size_t size, std::size_t curr_size);
 
 public:
   Sstable(std::string path);

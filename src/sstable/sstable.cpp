@@ -2,9 +2,12 @@
 #include "lsm_utilities.h"
 #include "memtable.h"
 #include "sstable_operation.h"
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fcntl.h>
+#include <iostream>
 #include <span>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -33,12 +36,17 @@ Sstable::~Sstable() { close(fd); };
 
 std::vector<RecordSstable> Sstable::linera_iteration() {
   std::size_t footer_offset{file_size - FOOTER_SIZE};
-  std::vector<std::byte> footer{};
-  std::vector<std::byte> blocks{};
+  std::vector<std::byte> footer{FOOTER_SIZE};
   std::vector<RecordSstable> res;
   std::size_t curr_size{};
   std::size_t block_size_offset{4};
   std::size_t start_pos{HEADER_SIZE};
+  std::size_t block_size{};
+
+  std::cerr << "footer test" << "file size :" << file_size << "\n";
+  std::cerr << "footer test" << "FOOTER_SIZE :" << FOOTER_SIZE << "\n";
+  std::cerr << "footer test" << "file - footer :" << (file_size - FOOTER_SIZE)
+            << "\n";
 
   ReadBlockResult footer_op_res{read_block(footer, FOOTER_SIZE, footer_offset)};
   if (footer_op_res == ReadBlockResult::ERROR) {
@@ -50,6 +58,8 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
 
   std::size_t total_file_size{file_size - index_size - FOOTER_SIZE};
 
+  std::vector<std::byte> blocks{total_file_size};
+
   ReadBlockResult blocks_op_res{read_block(blocks, total_file_size, 0)};
   if (blocks_op_res == ReadBlockResult::ERROR) {
     throw std::runtime_error(
@@ -60,19 +70,23 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
     std::uint32_t block_size_with_header{
         from_n_bytes_little_endian<std::uint32_t, 4>(
             std::span<std::byte>{blocks}.subspan(block_size_offset, 4))};
-    std::size_t block_size{block_size_with_header - HEADER_SIZE};
+    block_size += (block_size_with_header - HEADER_SIZE);
 
     parse_blocks(blocks, res, block_size, start_pos);
     curr_size += block_size_with_header;
     block_size_offset += block_size_with_header;
     start_pos += block_size_with_header;
+
+    std::cerr << "at the end of linear iteration : " << "curr size : "
+              << curr_size << "block_size_offset : " << block_size_offset
+              << "start pos : " << start_pos << "\n";
   }
 
   return res;
 };
 
 void Sstable::parse_blocks(std::vector<std::byte> &records,
-                           std::vector<RecordSstable> parsed_records,
+                           std::vector<RecordSstable> &parsed_records,
                            std::size_t size, std::size_t curr_size) {
   OperationRecord op{};
   std::uint32_t key_len{};
@@ -102,16 +116,16 @@ void Sstable::parse_blocks(std::vector<std::byte> &records,
     p_record.op = op;
 
     parsed_records.push_back(std::move(p_record));
+    std::cerr << "inside parse blocks : " << "curr size : " << curr_size
+              << "\n";
   }
 };
 
 std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
   std::size_t footer_offset{file_size - FOOTER_SIZE};
-  std::vector<std::byte> footer{};
+  std::vector<std::byte> footer{FOOTER_SIZE};
   std::size_t footer_res{};
   ssize_t read_res{};
-  std::vector<std::byte> index{};
-  std::vector<std::byte> records{};
   std::size_t data_block_size{};
 
   ReadBlockResult footer_op_res{read_block(footer, FOOTER_SIZE, footer_offset)};
@@ -124,6 +138,8 @@ std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
 
   std::uint64_t index_size{from_n_bytes_little_endian<std::uint64_t, 8>(
       std::span<std::byte>{footer}.subspan(8, 8))};
+
+  std::vector<std::byte> index{index_size};
 
   ReadBlockResult index_op_res{read_block(index, index_size, index_offset)};
   if (index_op_res == ReadBlockResult::ERROR) {
@@ -139,6 +155,8 @@ std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
     std::size_t temp{res};
     data_block_size = index_entries[res].offset - index_entries[++temp].offset;
   }
+
+  std::vector<std::byte> records{data_block_size};
 
   ReadBlockResult records_op_res{
       read_block(records, data_block_size, index_entries[res].offset)};
@@ -263,8 +281,15 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
   std::size_t block_result{};
   ssize_t read_result{};
 
+  std::cerr << "inside read block" << "size :" << size << "offset : " << offset
+            << "\n";
+
   while (block_result < size) {
     read_result = pread(fd, block.data(), size, offset);
+    std::cerr << "inside read loop " << "read reault : " << read_result << "\n";
+    std::cerr << "ERRNO " << errno << "(" << strerror(errno) << ")"
+              << "fd : " << fd << "foot offset : " << FOOTER_SIZE
+              << "file size : " << file_size << "\n";
     if (read_result == 0) {
       return ReadBlockResult::GOOD;
     }

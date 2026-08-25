@@ -5,6 +5,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <stdexcept>
+#include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -118,6 +119,7 @@ void SstableWriter::write_sstable(std::vector<std::vector<std::byte>> &data,
   std::vector<iovec> iovecs;
   long max_iovecs{sysconf(_SC_IOV_MAX)};
   std::size_t written_size{};
+  ssize_t writev_res;
 
   for (auto &block : data) {
     iovecs.push_back({.iov_base = block.data(), .iov_len = block.size()});
@@ -131,20 +133,34 @@ void SstableWriter::write_sstable(std::vector<std::vector<std::byte>> &data,
 
   if (iovecs.size() > max_iovecs) {
     for (; written_size < iovecs.size(); written_size += max_iovecs) {
-      writev(fd, iovecs.data() + written_size, max_iovecs);
+      writev_res = writev(fd, iovecs.data() + written_size, max_iovecs);
+      if (writev_res == -1) {
+        throw std::runtime_error("writeev failed for the multi iovec");
+      }
+
       if ((iovecs.size() - written_size) < max_iovecs) {
         break;
       }
     }
 
     if (written_size < iovecs.size()) {
-      writev(fd, iovecs.data() + written_size, iovecs.size() - written_size);
+      writev_res = writev(fd, iovecs.data() + written_size,
+                          iovecs.size() - written_size);
+      if (writev_res == -1) {
+        throw std::runtime_error("writeev failed for the multi iovec");
+      }
     }
   } else {
-    writev(fd, iovecs.data(), iovecs.size());
+    writev_res = writev(fd, iovecs.data(), iovecs.size());
+    if (writev_res == -1) {
+      throw std::runtime_error("writeev failed for the multi iovec");
+    }
   }
 
-  fsync(fd);
+  int fsync_res{fsync(fd)};
+  if (fsync_res == -1) {
+    throw std::runtime_error("could not create the file for sstable write");
+  }
 };
 
 void SstableWriter::flush_memtable(Memtable &memtable) {
