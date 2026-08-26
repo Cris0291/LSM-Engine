@@ -43,11 +43,6 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
   std::size_t start_pos{HEADER_SIZE};
   std::size_t block_size{};
 
-  std::cerr << "footer test" << "file size :" << file_size << "\n";
-  std::cerr << "footer test" << "FOOTER_SIZE :" << FOOTER_SIZE << "\n";
-  std::cerr << "footer test" << "file - footer :" << (file_size - FOOTER_SIZE)
-            << "\n";
-
   ReadBlockResult footer_op_res{read_block(footer, FOOTER_SIZE, footer_offset)};
   if (footer_op_res == ReadBlockResult::ERROR) {
     throw std::runtime_error("something went wrong while reading the footer");
@@ -58,7 +53,7 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
 
   std::size_t total_file_size{file_size - index_size - FOOTER_SIZE};
 
-  std::vector<std::byte> blocks{total_file_size};
+  std::vector<std::byte> blocks{total_file_size * 2};
 
   ReadBlockResult blocks_op_res{read_block(blocks, total_file_size, 0)};
   if (blocks_op_res == ReadBlockResult::ERROR) {
@@ -70,9 +65,9 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
     std::uint32_t block_size_with_header{
         from_n_bytes_little_endian<std::uint32_t, 4>(
             std::span<std::byte>{blocks}.subspan(block_size_offset, 4))};
-    block_size += (block_size_with_header - HEADER_SIZE);
+    block_size = (block_size_with_header - HEADER_SIZE);
 
-    parse_blocks(blocks, res, block_size, start_pos);
+    parse_blocks(blocks, res, start_pos + block_size, start_pos);
     curr_size += block_size_with_header;
     block_size_offset += block_size_with_header;
     start_pos += block_size_with_header;
@@ -116,8 +111,6 @@ void Sstable::parse_blocks(std::vector<std::byte> &records,
     p_record.op = op;
 
     parsed_records.push_back(std::move(p_record));
-    std::cerr << "inside parse blocks : " << "curr size : " << curr_size
-              << "\n";
   }
 };
 
