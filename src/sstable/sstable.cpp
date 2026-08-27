@@ -53,13 +53,17 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
 
   std::size_t total_file_size{file_size - index_size - FOOTER_SIZE};
 
-  std::vector<std::byte> blocks{total_file_size * 2};
+  std::vector<std::byte> blocks{total_file_size};
 
   ReadBlockResult blocks_op_res{read_block(blocks, total_file_size, 0)};
   if (blocks_op_res == ReadBlockResult::ERROR) {
     throw std::runtime_error(
         "something went wrong while reading the blocks of the file");
   }
+
+  std::cerr << "file size in reader : " << file_size
+            << "index size : " << index_size
+            << " data block size : " << total_file_size << "\n";
 
   while (curr_size < total_file_size) {
     std::uint32_t block_size_with_header{
@@ -71,10 +75,6 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
     curr_size += block_size_with_header;
     block_size_offset += block_size_with_header;
     start_pos += block_size_with_header;
-
-    std::cerr << "at the end of linear iteration : " << "curr size : "
-              << curr_size << "block_size_offset : " << block_size_offset
-              << "start pos : " << start_pos << "\n";
   }
 
   return res;
@@ -91,26 +91,33 @@ void Sstable::parse_blocks(std::vector<std::byte> &records,
   while (curr_size < size) {
     op = static_cast<OperationRecord>(records[curr_size]);
     curr_size += OP_SIZE;
+    std::cerr << "1" << "\n";
 
     key_len = from_n_bytes_little_endian<std::uint32_t, 4>(
         std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
     curr_size += KEY_VALUE_SIZE;
+    std::cerr << "2" << "\n";
 
     value_len = from_n_bytes_little_endian<std::uint32_t, 4>(
         std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
     curr_size += KEY_VALUE_SIZE;
+    std::cerr << "3" << "size : " << size << "cur size : " << curr_size << "\n";
 
     p_record.key = std::vector<std::byte>(
         records.begin() + curr_size, records.begin() + curr_size + key_len);
     curr_size += key_len;
+    std::cerr << "4" << "\n";
 
     p_record.value = std::vector<std::byte>(
         records.begin() + curr_size, records.begin() + curr_size + value_len);
     curr_size += value_len;
+    std::cerr << "5" << "\n";
 
     p_record.op = op;
+    std::cerr << "6" << "\n";
 
     parsed_records.push_back(std::move(p_record));
+    std::cerr << "7" << "\n";
   }
 };
 
@@ -274,15 +281,8 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
   std::size_t block_result{};
   ssize_t read_result{};
 
-  std::cerr << "inside read block" << "size :" << size << "offset : " << offset
-            << "\n";
-
   while (block_result < size) {
     read_result = pread(fd, block.data(), size, offset);
-    std::cerr << "inside read loop " << "read reault : " << read_result << "\n";
-    std::cerr << "ERRNO " << errno << "(" << strerror(errno) << ")"
-              << "fd : " << fd << "foot offset : " << FOOTER_SIZE
-              << "file size : " << file_size << "\n";
     if (read_result == 0) {
       return ReadBlockResult::GOOD;
     }

@@ -16,7 +16,7 @@ private:
   static constexpr std::size_t VALUE_SIZE{4};
   static constexpr std::size_t CRC_SIZE{4};
   static constexpr std::size_t BLOCK_SIZE{4};
-  static constexpr std::size_t INDEX_OFFSET{4};
+  static constexpr std::size_t INDEX_OFFSET{8};
   static constexpr std::uint32_t MAGIC{'SST1'};
   int fd;
   void create_blocks(
