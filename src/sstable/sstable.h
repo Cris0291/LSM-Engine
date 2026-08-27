@@ -15,6 +15,9 @@ private:
   static constexpr std::size_t KEY_VALUE_SIZE{4};
   int fd;
   std::size_t file_size;
+  std::vector<IndexEntry> index_entries;
+  std::uint64_t index_size;
+  std::uint64_t index_offset;
   template <typename T, std::size_t N>
   T from_n_bytes_little_endian(std::span<std::byte> bytes_to_copy) {
     T value_n{T{}};

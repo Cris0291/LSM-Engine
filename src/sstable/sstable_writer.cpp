@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
-#include <iostream>
 #include <stdexcept>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -124,24 +123,15 @@ void SstableWriter::write_sstable(std::vector<std::vector<std::byte>> &data,
   std::size_t written_size{};
   ssize_t writev_res;
 
-  std::size_t test_blocks{};
-  std::size_t test_index{};
-
   for (auto &block : data) {
-    test_blocks += block.size();
     iovecs.push_back({.iov_base = block.data(), .iov_len = block.size()});
   }
 
   for (auto &block : index) {
-    std::cerr << "index size : " << block.size() << "\n";
-    test_index += block.size();
     iovecs.push_back({.iov_base = block.data(), .iov_len = block.size()});
   }
-  std::cerr << "footer size : " << footer.size() << "\n";
-  iovecs.push_back({.iov_base = footer.data(), .iov_len = footer.size()});
 
-  std::cerr << "true data block size : " << test_blocks << "\n";
-  std::cerr << "true index size : " << test_index << "\n";
+  iovecs.push_back({.iov_base = footer.data(), .iov_len = footer.size()});
 
   if (iovecs.size() > max_iovecs) {
     for (; written_size < iovecs.size(); written_size += max_iovecs) {
@@ -189,7 +179,6 @@ void SstableWriter::flush_memtable(Memtable &memtable) {
 
   std::uint64_t index_offset{index_res.first};
   std::uint64_t index_size{index_res.second};
-  std::cerr << "first index size : " << index_size << "\n";
 
   to_8_bytes_little_endian(index_offset, footer);
   to_8_bytes_little_endian(index_size, footer);

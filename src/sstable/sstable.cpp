@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
-#include <iostream>
 #include <span>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -30,26 +29,43 @@ Sstable::Sstable(std::string path) {
   }
 
   file_size = file_info.st_size;
-};
 
-Sstable::~Sstable() { close(fd); };
-
-std::vector<RecordSstable> Sstable::linera_iteration() {
   std::size_t footer_offset{file_size - FOOTER_SIZE};
   std::vector<std::byte> footer{FOOTER_SIZE};
-  std::vector<RecordSstable> res;
-  std::size_t curr_size{};
-  std::size_t block_size_offset{4};
-  std::size_t start_pos{HEADER_SIZE};
-  std::size_t block_size{};
+  std::size_t footer_res{};
 
   ReadBlockResult footer_op_res{read_block(footer, FOOTER_SIZE, footer_offset)};
   if (footer_op_res == ReadBlockResult::ERROR) {
     throw std::runtime_error("something went wrong while reading the footer");
   }
 
-  std::uint64_t index_size{from_n_bytes_little_endian<std::uint64_t, 8>(
+  std::uint64_t _index_offset{from_n_bytes_little_endian<std::uint64_t, 8>(
+      std::span<std::byte>{footer}.subspan(0, 8))};
+
+  std::uint64_t _index_size{from_n_bytes_little_endian<std::uint64_t, 8>(
       std::span<std::byte>{footer}.subspan(8, 8))};
+
+  std::vector<std::byte> index{_index_size};
+
+  ReadBlockResult index_op_res{read_block(index, _index_size, _index_offset)};
+  if (index_op_res == ReadBlockResult::ERROR) {
+    throw std::runtime_error("something went wrong while reading the index");
+  }
+
+  std::vector<IndexEntry> _index_entries{parse_index(index)};
+  index_entries = std::move(_index_entries);
+  index_size = _index_size;
+  index_offset = _index_offset;
+};
+
+Sstable::~Sstable() { close(fd); };
+
+std::vector<RecordSstable> Sstable::linera_iteration() {
+  std::vector<RecordSstable> res;
+  std::size_t curr_size{};
+  std::size_t block_size_offset{4};
+  std::size_t start_pos{HEADER_SIZE};
+  std::size_t block_size{};
 
   std::size_t total_file_size{file_size - index_size - FOOTER_SIZE};
 
@@ -60,10 +76,6 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
     throw std::runtime_error(
         "something went wrong while reading the blocks of the file");
   }
-
-  std::cerr << "file size in reader : " << file_size
-            << "index size : " << index_size
-            << " data block size : " << total_file_size << "\n";
 
   while (curr_size < total_file_size) {
     std::uint32_t block_size_with_header{
@@ -91,62 +103,32 @@ void Sstable::parse_blocks(std::vector<std::byte> &records,
   while (curr_size < size) {
     op = static_cast<OperationRecord>(records[curr_size]);
     curr_size += OP_SIZE;
-    std::cerr << "1" << "\n";
 
     key_len = from_n_bytes_little_endian<std::uint32_t, 4>(
         std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
     curr_size += KEY_VALUE_SIZE;
-    std::cerr << "2" << "\n";
 
     value_len = from_n_bytes_little_endian<std::uint32_t, 4>(
         std::span<std::byte>{records}.subspan(curr_size, KEY_VALUE_SIZE));
     curr_size += KEY_VALUE_SIZE;
-    std::cerr << "3" << "size : " << size << "cur size : " << curr_size << "\n";
 
     p_record.key = std::vector<std::byte>(
         records.begin() + curr_size, records.begin() + curr_size + key_len);
     curr_size += key_len;
-    std::cerr << "4" << "\n";
 
     p_record.value = std::vector<std::byte>(
         records.begin() + curr_size, records.begin() + curr_size + value_len);
     curr_size += value_len;
-    std::cerr << "5" << "\n";
 
     p_record.op = op;
-    std::cerr << "6" << "\n";
 
     parsed_records.push_back(std::move(p_record));
-    std::cerr << "7" << "\n";
   }
 };
 
 std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
-  std::size_t footer_offset{file_size - FOOTER_SIZE};
-  std::vector<std::byte> footer{FOOTER_SIZE};
-  std::size_t footer_res{};
-  ssize_t read_res{};
   std::size_t data_block_size{};
 
-  ReadBlockResult footer_op_res{read_block(footer, FOOTER_SIZE, footer_offset)};
-  if (footer_op_res == ReadBlockResult::ERROR) {
-    throw std::runtime_error("something went wrong while reading the footer");
-  }
-
-  std::uint64_t index_offset{from_n_bytes_little_endian<std::uint64_t, 8>(
-      std::span<std::byte>{footer}.subspan(0, 8))};
-
-  std::uint64_t index_size{from_n_bytes_little_endian<std::uint64_t, 8>(
-      std::span<std::byte>{footer}.subspan(8, 8))};
-
-  std::vector<std::byte> index{index_size};
-
-  ReadBlockResult index_op_res{read_block(index, index_size, index_offset)};
-  if (index_op_res == ReadBlockResult::ERROR) {
-    throw std::runtime_error("something went wrong while reading the index");
-  }
-
-  std::vector<IndexEntry> index_entries{parse_index(index)};
   std::size_t res{search_entry(index_entries, key)};
 
   if (res == index_entries.size() - 1) {

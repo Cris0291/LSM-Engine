@@ -73,3 +73,12 @@ TEST_F(SstableTest, RoundTrip) {
     EXPECT_EQ(mem_records[i].value, sstable_records[i].value);
   }
 };
+
+TEST_F(SstableTest, ReadRecord) {
+  // Arrange
+  SstableWriter sswriter{file_path, dir_path};
+  Memtable memtable{create_memtable()};
+  std::vector<Memtable::Record> mem_records{memtable.linear_iteration()};
+  sswriter.flush_memtable(memtable);
+  Sstable ssreader{file_path};
+};
