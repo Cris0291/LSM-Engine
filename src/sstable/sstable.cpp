@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
+#include <iostream>
 #include <span>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -17,7 +18,7 @@
 Sstable::Sstable(std::string path) {
   fd = open(path.data(), O_RDONLY);
   if (fd == -1) {
-    throw std::runtime_error("sstable could nto be found");
+    throw std::runtime_error("sstable could not be found");
   }
 
   struct stat file_info;
@@ -53,6 +54,7 @@ Sstable::Sstable(std::string path) {
   }
 
   std::vector<IndexEntry> _index_entries{parse_index(index)};
+
   index_entries = std::move(_index_entries);
   index_size = _index_size;
   index_offset = _index_offset;
@@ -132,16 +134,17 @@ std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
   std::size_t res{search_entry(index_entries, key)};
 
   if (res == index_entries.size() - 1) {
-    data_block_size = index_entries[res].offset - index_offset;
+    data_block_size = index_offset - index_entries[res].offset;
   } else {
     std::size_t temp{res};
-    data_block_size = index_entries[res].offset - index_entries[++temp].offset;
+    data_block_size = index_entries[++temp].offset - index_entries[res].offset;
   }
 
   std::vector<std::byte> records{data_block_size};
 
   ReadBlockResult records_op_res{
       read_block(records, data_block_size, index_entries[res].offset)};
+
   if (records_op_res == ReadBlockResult::ERROR) {
     throw std::runtime_error(
         "something went wrong while reading the data block");
@@ -162,18 +165,24 @@ std::vector<IndexEntry> Sstable::parse_index(std::vector<std::byte> &index) {
   while (offset < index.size()) {
     std::span<std::byte> offset_window{
         std::span<std::byte>{index}.subspan(offset, offset_size)};
+
     std::uint64_t off64{
         from_n_bytes_little_endian<std::uint64_t, 8>(offset_window)};
+
     index_entry.offset = off64;
     offset += offset_size;
 
     std::span<std::byte> key_len_window{
         std::span<std::byte>{index}.subspan(offset, key_size)};
+
     std::uint32_t key_len{
         from_n_bytes_little_endian<std::uint32_t, 4>(key_len_window)};
+
     offset += key_size;
 
-    std::vector<std::byte> key(index.begin() + offset, index.begin() + key_len);
+    std::vector<std::byte> key(index.begin() + offset,
+                               index.begin() + offset + key_len);
+
     index_entry.key = key;
     res.push_back(index_entry);
     offset += key_len;
@@ -208,7 +217,7 @@ Sstable::search_records(std::vector<std::byte> &records,
   std::uint32_t crc{from_n_bytes_little_endian<std::uint32_t, 4>(
       std::span<std::byte>{records}.subspan(0, 4))};
   std::uint32_t block_size{from_n_bytes_little_endian<std::uint32_t, 4>(
-      std::span<std::byte>{records}.subspan(0, 4))};
+      std::span<std::byte>{records}.subspan(4, 4))};
   std::uint32_t record_count{from_n_bytes_little_endian<std::uint32_t, 4>(
       std::span<std::byte>{records}.subspan(8, 4))};
 

@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <format>
 #include <gtest/gtest.h>
+#include <optional>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -76,9 +77,23 @@ TEST_F(SstableTest, RoundTrip) {
 
 TEST_F(SstableTest, ReadRecord) {
   // Arrange
+  std::size_t max_keys{10000};
   SstableWriter sswriter{file_path, dir_path};
   Memtable memtable{create_memtable()};
   std::vector<Memtable::Record> mem_records{memtable.linear_iteration()};
   sswriter.flush_memtable(memtable);
   Sstable ssreader{file_path};
+  std::optional<RecordSstable> res;
+
+  // Act
+  for (int i{}; i < max_keys; i++) {
+    std::vector<std::byte> key{bytes(std::format("key_{:06d}", i))};
+    res = ssreader.read(key);
+
+    // Assert
+    EXPECT_TRUE(res.has_value());
+    EXPECT_EQ(res->key, mem_records[i].key);
+    EXPECT_EQ(res->value, mem_records[i].value);
+    EXPECT_EQ(res->op, mem_records[i].op);
+  }
 };
