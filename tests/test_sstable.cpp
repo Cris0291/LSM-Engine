@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <format>
 #include <gtest/gtest.h>
+#include <iostream>
 #include <optional>
 #include <string>
 #include <unistd.h>
@@ -97,3 +98,66 @@ TEST_F(SstableTest, ReadRecord) {
     EXPECT_EQ(res->op, mem_records[i].op);
   }
 };
+
+TEST_F(SstableTest, ReadNonExistentRecordBeforeFirst) {
+  // Arrange
+  SstableWriter sswriter{file_path, dir_path};
+  Memtable memtable{create_memtable()};
+  sswriter.flush_memtable(memtable);
+  Sstable ssreader{file_path};
+  std::vector<std::byte> fake_key{bytes("aaa")};
+
+  /// Act
+  std::optional<RecordSstable> res{ssreader.read(fake_key)};
+
+  // Assert
+  EXPECT_FALSE(res.has_value());
+}
+
+TEST_F(SstableTest, ReadNonExistentRecordAfterLast) {
+  // Arrange
+  SstableWriter sswriter{file_path, dir_path};
+  Memtable memtable{create_memtable()};
+  sswriter.flush_memtable(memtable);
+  Sstable ssreader{file_path};
+  std::vector<std::byte> fake_key{bytes("zzz")};
+
+  /// Act
+  std::optional<RecordSstable> res{ssreader.read(fake_key)};
+
+  // Assert
+  EXPECT_FALSE(res.has_value());
+}
+
+TEST_F(SstableTest, ReadNonExistentRecordBetweenKeys) {
+  // Arrange
+  SstableWriter sswriter{file_path, dir_path};
+  Memtable memtable{create_memtable()};
+  sswriter.flush_memtable(memtable);
+  Sstable ssreader{file_path};
+  std::vector<std::byte> fake_key{bytes("key_00700_7")};
+
+  /// Act
+  std::optional<RecordSstable> res{ssreader.read(fake_key)};
+
+  // Assert
+  EXPECT_FALSE(res.has_value());
+}
+
+TEST_F(SstableTest, ReadTombStone) {
+  // Arrange
+  SstableWriter sswriter{file_path, dir_path};
+  Memtable memtable{create_memtable()};
+  std::vector<std::byte> tombstone_key{bytes("key_00700_7")};
+  memtable.insert(tombstone_key, tombstone_key, OperationRecord::DELETE, true);
+  sswriter.flush_memtable(memtable);
+  Sstable ssreader{file_path};
+
+  /// Act
+  std::optional<RecordSstable> res{ssreader.read(tombstone_key)};
+
+  // Assert
+  EXPECT_TRUE(res.has_value());
+  EXPECT_EQ(res->key, tombstone_key);
+  EXPECT_EQ(res->op, OperationRecord::DELETE);
+}

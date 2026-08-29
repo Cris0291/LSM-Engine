@@ -132,6 +132,7 @@ std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
   std::size_t data_block_size{};
 
   std::size_t res{search_entry(index_entries, key)};
+  std::cerr << "after search entry " << "res : " << res << "\n";
 
   if (res == index_entries.size() - 1) {
     data_block_size = index_offset - index_entries[res].offset;
@@ -199,6 +200,10 @@ std::size_t Sstable::search_entry(const std::vector<IndexEntry> &entries,
 
   while (low <= high) {
     std::size_t mid = low + (high - low) / 2;
+    std::cerr << "inside search_entry " << "low : " << low << "mid : " << mid
+              << "high : " << high << "\n";
+    if (low == 0 && high == 0)
+      return mid;
     int comparison{compare_bytes(entries[mid].key, key)};
     if (comparison <= 0) {
       res = mid;
