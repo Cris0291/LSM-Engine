@@ -28,6 +28,12 @@ target_include_directories(sstable_lib PUBLIC src/sstable)
 target_link_libraries(sstable_lib PUBLIC memtable_lib)
 target_link_libraries(sstable_lib PUBLIC ZLIB::ZLIB)
 
+add_library(engine_lib src/engine/LsmEngine.cpp)
+target_include_directories(engine_lib PUBLIC src/engine)
+target_link_libraries(engine_lib PUBLIC memtable_lib)
+target_link_libraries(engine_lib PUBLIC wal_lib)
+target_link_libraries(engine_lib PUBLIC sstable_lib)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest

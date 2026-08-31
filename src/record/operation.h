@@ -1,6 +1,9 @@
+#pragma once
+
 #include <cstddef>
 #include <span>
 #include <vector>
+
 enum class OperationRecord : unsigned char {
   PUT,
   DELETE,

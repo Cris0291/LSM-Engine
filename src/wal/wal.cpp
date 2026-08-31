@@ -129,7 +129,6 @@ std::vector<Record> Wal::replay() {
       break;
     }
     case ReplayState::RESIZE: {
-      std::cout << "7" << "\n";
       current_buffer_size = replay_resize(buffer);
       replay_res.pos_offset = replay_res.total_buffer_bytes;
       replay_res.leftover = current_buffer_size - replay_res.total_buffer_bytes;

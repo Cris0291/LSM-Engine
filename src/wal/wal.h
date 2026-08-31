@@ -1,3 +1,5 @@
+#pragma once
+
 #include "record-encoder.h"
 #include <fcntl.h>
 #include <sys/stat.h>
