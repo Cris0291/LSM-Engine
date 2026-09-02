@@ -16,6 +16,7 @@ public:
 
 private:
   static constexpr int MAX_HEIGHT{32};
+  static constexpr int OP_SIZE{1};
   const uint32_t seed;
   int current_height{0};
   Node *top;
@@ -28,6 +29,7 @@ private:
   static Record copy_node_to_record(Node *node);
 
 public:
+  std::size_t total_byte_count;
   ~Memtable();
   Memtable(uint32_t _seed);
   std::optional<Record> search(std::vector<std::byte> key);

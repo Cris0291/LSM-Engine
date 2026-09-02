@@ -93,6 +93,8 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
   // second case we need to insert
 
   int height{random_height()};
+  std::size_t temp_byte_count{sizeof(Node) + sizeof(Node *) + key.size() +
+                              value.size()};
   Node *node{new Node(std::move(key), std::move(value), op, height)};
 
   for (int i{}; i < update.size(); i++) {
@@ -111,6 +113,7 @@ void Memtable::insert(std::vector<std::byte> key, std::vector<std::byte> value,
     current_height = height;
   }
   total_node_count += 1;
+  total_byte_count += temp_byte_count;
   return;
 };
 
