@@ -1,3 +1,3 @@
 #pragma once
 
-enum class MemoryUnit { KB, MB };
+enum class MemoryUnit { B, KB, MB };

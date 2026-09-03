@@ -7,15 +7,20 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 class LsmEngine {
 private:
-  std::size_t memory_threshold;
+  std::size_t size_threshold;
   MemoryUnit memory_unit;
   std::vector<std::unique_ptr<Sstable>> records;
   Memtable memtable;
   Wal wal;
+  std::size_t bytes_convertion(std::size_t bytes);
+  std::pair<std::string, std::string> create_path();
+  std::string generate_unique_number_id();
 
 public:
   std::optional<std::vector<std::byte>> get(std::vector<std::byte> key);
