@@ -1,7 +1,9 @@
 #include "wal.h"
 #include <cstddef>
+#include <cstdio>
 #include <iostream>
 #include <sys/types.h>
+#include <unistd.h>
 
 Wal::Wal(const char *d_path, const char *f_path)
     : directory_path(d_path), file_path(f_path) {
@@ -254,6 +256,17 @@ std::vector<Record> Wal::replay_whole_file() {
     }
   }
   return res;
+}
+
+void Wal::reset() {
+  if (ftruncate(fd, 0) == -1) {
+    // do soemthing still pending have to see how it matches the engine life
+    // cycle
+  }
+
+  if (lseek(fd, 0, SEEK_SET) == -1) {
+    // same as before
+  }
 }
 
 std::size_t Wal::get_size() {

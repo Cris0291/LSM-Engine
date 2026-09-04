@@ -5,6 +5,7 @@
 #include "sstable.h"
 #include "wal.h"
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -21,6 +22,7 @@ private:
   std::size_t bytes_convertion(std::size_t bytes);
   std::pair<std::string, std::string> create_path();
   std::string generate_unique_number_id();
+  std::uint32_t generate_seed();
 
 public:
   std::optional<std::vector<std::byte>> get(std::vector<std::byte> key);
