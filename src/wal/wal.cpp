@@ -267,6 +267,9 @@ void Wal::reset() {
   if (lseek(fd, 0, SEEK_SET) == -1) {
     // same as before
   }
+
+  if (fsync(fd) == -1) {
+  }
 }
 
 std::size_t Wal::get_size() {

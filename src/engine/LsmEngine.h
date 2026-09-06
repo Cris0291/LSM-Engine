@@ -16,6 +16,7 @@ class LsmEngine {
 private:
   std::size_t size_threshold;
   MemoryUnit memory_unit;
+  int fd_flock;
   std::vector<std::unique_ptr<Sstable>> records;
   Memtable memtable;
   Wal wal;
@@ -23,8 +24,11 @@ private:
   std::pair<std::string, std::string> create_path();
   std::string generate_unique_number_id();
   std::uint32_t generate_seed();
+  bool surpass_threshold();
+  void flush_state();
 
 public:
+  LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);
   std::optional<std::vector<std::byte>> get(std::vector<std::byte> key);
   void put(std::vector<std::byte> key, std::vector<std::byte> value);
   void delete_record(std::vector<std::byte> key);
