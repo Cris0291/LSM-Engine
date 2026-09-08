@@ -14,6 +14,8 @@
 
 class LsmEngine {
 private:
+  static constexpr std::string LOCK_PATH{"/LOCK"};
+  static constexpr std::string WAL_PATH{"wal.log"};
   std::size_t size_threshold;
   MemoryUnit memory_unit;
   int fd_flock;

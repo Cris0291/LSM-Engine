@@ -2,11 +2,20 @@
 #include "lsm_utilities.h"
 #include <algorithm>
 #include <bit>
-#include <iostream>
+#include <utility>
 
 Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
   Node *node{new Node(MAX_HEIGHT)};
   top = node;
+};
+
+Memtable::~Memtable() {
+  Node *temp{nullptr};
+  while (top) {
+    temp = top->forward_list[0];
+    delete top;
+    top = temp;
+  }
 };
 
 Node *Memtable::search_for_node(const std::vector<std::byte> &key,
@@ -144,15 +153,6 @@ std::vector<Memtable::Record> Memtable::linear_iteration() {
   }
 
   return records;
-};
-
-Memtable::~Memtable() {
-  Node *temp{nullptr};
-  while (top) {
-    temp = top->forward_list[0];
-    delete top;
-    top = temp;
-  }
 };
 
 std::string Memtable::to_str(std::vector<std::byte> bytes) {

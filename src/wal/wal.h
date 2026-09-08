@@ -24,8 +24,10 @@ private:
   std::size_t replay_resize(std::vector<std::byte> &buffer);
 
 public:
+  Wal();
   Wal(const char *d_path, const char *f_path);
   ~Wal();
+  Wal &operator=(Wal &&wal) noexcept;
   void append(OperationRecord op, std::span<std::byte> key,
               std::span<std::byte> value);
   std::vector<Record> replay();

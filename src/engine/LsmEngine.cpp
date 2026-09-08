@@ -4,6 +4,8 @@
 #include "operation.h"
 #include "sstable.h"
 #include "sstable_writer.h"
+#include "wal.h"
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
@@ -18,7 +20,8 @@
 #include <unistd.h>
 
 LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
-                     MemoryUnit unit) {
+                     MemoryUnit unit)
+    : memtable(generate_seed()) {
   if (std::filesystem::exists(dir_path)) {
     if (!std::filesystem::is_directory(dir_path)) {
       throw std::runtime_error("path is not a directory");
@@ -50,15 +53,27 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
     if (!is_created) {
       throw std::runtime_error("directory could not be created");
     }
-    std::string flock_path{dir_path + "/LOCK"};
+    std::string flock_path{dir_path + LOCK_PATH};
     int _fd_flock{open(flock_path.data(), O_RDWR | O_CREAT, 0666)};
     if (_fd_flock == -1) {
-      throw std::runtime_error("lock file could not be created");
+      throw std::runtime_error("there was a problem creating the file lock");
+    }
+    int lock_res{flock(_fd_flock, LOCK_EX | LOCK_NB)};
+    if (lock_res == -1) {
+      int error;
+      close(_fd_flock);
+      error = errno;
+      if (error == EWOULDBLOCK) {
+        throw std::runtime_error("flock was already in use");
+      }
+
+      throw std::runtime_error("there was a problem locking the flock file");
     }
     fd_flock = _fd_flock;
     // init all state
-    Memtable _memtable{Memtable(generate_seed())};
-    memtable = _memtable;
+    std::string wal_path{dir_path + WAL_PATH};
+    Wal _wal(dir_path.data(), wal_path.data());
+    wal = std::move(_wal);
   }
 }
 

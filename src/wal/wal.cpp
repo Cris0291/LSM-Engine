@@ -1,9 +1,11 @@
 #include "wal.h"
 #include <cstddef>
 #include <cstdio>
-#include <iostream>
 #include <sys/types.h>
 #include <unistd.h>
+#include <utility>
+
+Wal::Wal() : directory_path(nullptr), file_path(nullptr), fd(-1) {}
 
 Wal::Wal(const char *d_path, const char *f_path)
     : directory_path(d_path), file_path(f_path) {
@@ -22,6 +24,18 @@ Wal::Wal(const char *d_path, const char *f_path)
 }
 
 Wal::~Wal() { close(fd); }
+
+Wal &Wal::operator=(Wal &&wal) noexcept {
+  if (this == &wal) {
+    return *this;
+  }
+
+  std::swap(this->fd, wal.fd);
+  std::swap(this->directory_path, wal.directory_path);
+  std::swap(this->file_path, wal.file_path);
+
+  return *this;
+}
 
 void Wal::append(OperationRecord op, std::span<std::byte> key,
                  std::span<std::byte> value) {
