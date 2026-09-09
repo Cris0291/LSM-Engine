@@ -13,7 +13,6 @@ private:
   const char *directory_path;
   const char *file_path;
   int fd;
-  std::size_t get_size();
   std::pair<std::size_t, DecodeStatus>
   replay_decode(std::vector<Record> &res, std::vector<std::byte> &buffer,
                 std::size_t buffer_size);
@@ -28,6 +27,7 @@ public:
   Wal(const char *d_path, const char *f_path);
   ~Wal();
   Wal &operator=(Wal &&wal) noexcept;
+  std::size_t get_size();
   void append(OperationRecord op, std::span<std::byte> key,
               std::span<std::byte> value);
   std::vector<Record> replay();

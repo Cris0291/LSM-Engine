@@ -5,7 +5,6 @@
 #include "sstable.h"
 #include "sstable_writer.h"
 #include "wal.h"
-#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
@@ -21,59 +20,34 @@
 
 LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
                      MemoryUnit unit)
-    : memtable(generate_seed()) {
-  if (std::filesystem::exists(dir_path)) {
-    if (!std::filesystem::is_directory(dir_path)) {
-      throw std::runtime_error("path is not a directory");
-    }
-    std::string flock_path{dir_path + "/LOCK"};
-    int _fd_flock{open(flock_path.data(), O_RDWR)};
-    if (_fd_flock == -1) {
-      throw std::runtime_error(
-          "lock file does not exist, directory does not belong to an engine");
-    }
-    int lock_res{flock(_fd_flock, LOCK_EX | LOCK_NB)};
-    if (lock_res == -1) {
-      int error;
-      close(_fd_flock);
-      error = errno;
-      if (error == EWOULDBLOCK) {
-        throw std::runtime_error("flock was already in use");
-      }
+    : memtable(generate_seed()), size_threshold(threshold), memory_unit(unit) {
+  bool dir_exists{std::filesystem::exists(dir_path)};
+  bool is_dir{std::filesystem::is_directory(dir_path)};
 
-      throw std::runtime_error("there was a problem locking the flock file");
-    }
-    // here it is safe to manipulate the contest of the directory
-    // also implicitly is determined that this directory belongs to an lsmengine
-    // object finally we save flock in order to gain ownership
-    fd_flock = _fd_flock;
-    // after this init all state
-  } else {
+  if (dir_exists && !is_dir) {
+    throw std::runtime_error("path is not a directory");
+  }
+
+  if (!dir_exists) {
     bool is_created{std::filesystem::create_directory(dir_path)};
     if (!is_created) {
       throw std::runtime_error("directory could not be created");
     }
-    std::string flock_path{dir_path + LOCK_PATH};
-    int _fd_flock{open(flock_path.data(), O_RDWR | O_CREAT, 0666)};
-    if (_fd_flock == -1) {
-      throw std::runtime_error("there was a problem creating the file lock");
-    }
-    int lock_res{flock(_fd_flock, LOCK_EX | LOCK_NB)};
-    if (lock_res == -1) {
-      int error;
-      close(_fd_flock);
-      error = errno;
-      if (error == EWOULDBLOCK) {
-        throw std::runtime_error("flock was already in use");
-      }
+  }
 
-      throw std::runtime_error("there was a problem locking the flock file");
+  std::string flock_path{dir_path + LOCK_PATH};
+  fd_flock = set_flock(flock_path);
+
+  std::string wal_path{dir_path + WAL_PATH};
+  Wal _wal(dir_path.data(), wal_path.data());
+  wal = std::move(_wal);
+
+  if (wal.get_size() > 0) {
+    std::vector<Record> records{wal.replay()};
+    for (Record record : records) {
+      memtable.insert(record.key, record.value, record.op,
+                      record.op == OperationRecord::DELETE);
     }
-    fd_flock = _fd_flock;
-    // init all state
-    std::string wal_path{dir_path + WAL_PATH};
-    Wal _wal(dir_path.data(), wal_path.data());
-    wal = std::move(_wal);
   }
 }
 
@@ -178,4 +152,24 @@ void LsmEngine::flush_state() {
   std::destroy_at(&memtable);
   std::construct_at(&memtable, std::move(new_memtable));
   wal.reset();
+}
+
+int LsmEngine::set_flock(std::string flock_path) {
+  int _fd_flock{open(flock_path.data(), O_RDWR | O_CREAT, 0666)};
+  if (_fd_flock == -1) {
+    throw std::runtime_error(
+        "lock file does not exist, directory does not belong to an engine");
+  }
+  int lock_res{flock(_fd_flock, LOCK_EX | LOCK_NB)};
+  if (lock_res == -1) {
+    int error;
+    close(_fd_flock);
+    error = errno;
+    if (error == EWOULDBLOCK) {
+      throw std::runtime_error("flock was already in use");
+    }
+
+    throw std::runtime_error("there was a problem locking the flock file");
+  }
+  return _fd_flock;
 }

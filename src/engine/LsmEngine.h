@@ -9,6 +9,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <sys/types.h>
 #include <utility>
 #include <vector>
 
@@ -28,6 +29,7 @@ private:
   std::uint32_t generate_seed();
   bool surpass_threshold();
   void flush_state();
+  int set_flock(std::string flock_path);
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);
