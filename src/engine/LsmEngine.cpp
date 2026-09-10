@@ -35,6 +35,8 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
     }
   }
 
+  dir = dir_path;
+
   std::string flock_path{dir_path + LOCK_PATH};
   fd_flock = set_flock(flock_path);
 
@@ -49,6 +51,16 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
                       record.op == OperationRecord::DELETE);
     }
   }
+
+  std::string _sstable_dir{dir_path + SSTABLE_DIR};
+  if (!std::filesystem::exists(_sstable_dir)) {
+    bool is_sstable_created{std::filesystem::create_directory(_sstable_dir)};
+    if (!is_sstable_created) {
+      throw std::runtime_error("sstble directory could not be created");
+    }
+  }
+
+  sstable_dir = _sstable_dir;
 }
 
 std::optional<std::vector<std::byte>>
