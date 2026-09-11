@@ -5,12 +5,13 @@
 #include "sstable.h"
 #include "sstable_writer.h"
 #include "wal.h"
+#include <algorithm>
 #include <cerrno>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <fcntl.h>
 #include <filesystem>
+#include <format>
 #include <memory>
 #include <random>
 #include <stdexcept>
@@ -60,7 +61,34 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
     }
   }
 
+  if (!std::filesystem::is_directory(_sstable_dir)) {
+    throw std::runtime_error("sstble was not a directory");
+  }
+
   sstable_dir = _sstable_dir;
+
+  if (!std::filesystem::is_empty(sstable_dir)) {
+    try {
+      for (const auto &entry :
+           std::filesystem::directory_iterator(sstable_dir)) {
+        if (!entry.is_directory()) {
+          records.push_back(std::make_unique<Sstable>(entry.path()));
+        }
+      }
+    } catch (const std::filesystem::filesystem_error &e) {
+      throw;
+    }
+  }
+
+  if (records.size() > 1) {
+    std::sort(records.begin(), records.end(),
+              [](const std::unique_ptr<Sstable> &a,
+                 const std::unique_ptr<Sstable> &b) {
+                return a.get()->sstable_path < b.get()->sstable_path;
+              });
+
+    sstable_count = records.size();
+  }
 }
 
 std::optional<std::vector<std::byte>>
@@ -114,30 +142,10 @@ std::size_t LsmEngine::bytes_convertion(std::size_t bytes) {
   }
 }
 
-std::pair<std::string, std::string> LsmEngine::create_path() {
-  std::filesystem::path dir_path;
-  std::filesystem::path file_path;
-
-  dir_path = std::filesystem::temp_directory_path() /
-             ("sstable_" + generate_unique_number_id());
-  std::filesystem::create_directory(dir_path);
-  file_path = dir_path / "sstable.txt";
-
-  return {file_path, dir_path};
-}
-
-std::string LsmEngine::generate_unique_number_id() {
-  auto now{std::chrono::high_resolution_clock::now()};
-  auto nanos{std::chrono::duration_cast<std::chrono::nanoseconds>(
-                 now.time_since_epoch())
-                 .count()};
-
-  std::random_device rd;
-  std::mt19937_64 gen(rd());
-  std::uniform_int_distribution<std::uint64_t> dis;
-  auto random_num{dis(gen)};
-
-  return std::to_string(nanos) + "_" + std::to_string(random_num);
+std::string LsmEngine::create_path() {
+  std::string sstable_file{std::format("sstable_{:06d}", sstable_count)};
+  sstable_count += 1;
+  return sstable_dir + "/" + sstable_file;
 }
 
 std::uint32_t LsmEngine::generate_seed() {
@@ -155,10 +163,10 @@ bool LsmEngine::surpass_threshold() {
 }
 
 void LsmEngine::flush_state() {
-  auto path{create_path()};
-  SstableWriter stable_writer{SstableWriter(path.first, path.second)};
+  std::string path{create_path()};
+  SstableWriter stable_writer{SstableWriter(path, sstable_dir)};
   stable_writer.flush_memtable(memtable);
-  records.push_back(std::make_unique<Sstable>(path.first));
+  records.push_back(std::make_unique<Sstable>(path));
 
   Memtable new_memtable{Memtable(generate_seed())};
   std::destroy_at(&memtable);

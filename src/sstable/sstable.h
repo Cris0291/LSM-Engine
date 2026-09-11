@@ -40,6 +40,7 @@ private:
                     std::size_t size, std::size_t curr_size);
 
 public:
+  std::string sstable_path;
   Sstable(std::string path);
   ~Sstable();
   std::optional<RecordSstable> read(std::vector<std::byte> key);

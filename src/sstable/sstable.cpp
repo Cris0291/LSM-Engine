@@ -58,6 +58,8 @@ Sstable::Sstable(std::string path) {
   index_entries = std::move(_index_entries);
   index_size = _index_size;
   index_offset = _index_offset;
+
+  sstable_path = path;
 };
 
 Sstable::~Sstable() { close(fd); };
