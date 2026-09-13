@@ -34,6 +34,7 @@ target_include_directories(engine_lib PUBLIC src/engine)
 target_link_libraries(engine_lib PUBLIC memtable_lib)
 target_link_libraries(engine_lib PUBLIC wal_lib)
 target_link_libraries(engine_lib PUBLIC sstable_lib)
+target_link_libraries(engine_lib PUBLIC utility)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -58,9 +59,13 @@ target_link_libraries(memtable_tests PRIVATE record_codec memtable_lib utility G
 add_executable(sstable_tests tests/test_sstable.cpp)
 target_link_libraries(sstable_tests PRIVATE  sstable_lib memtable_lib utility GTest::gtest_main)
 
+add_executable(engine_tests tests/test_engine.cpp)
+target_link_libraries(engine_tests PRIVATE engine_lib memtable_lib wal_lib sstable_lib utility GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(codec_tests)
 gtest_discover_tests(wal_tests)
 gtest_discover_tests(memtable_tests)
 gtest_discover_tests(sstable_tests)
+gtest_discover_tests(engine_tests)
 

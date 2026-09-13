@@ -24,9 +24,13 @@ private:
 
 public:
   std::size_t total_byte_count;
-  ~Memtable();
+  Memtable();
   Memtable(uint32_t _seed);
+  Memtable(Memtable &memtable) = delete;
+  Memtable &operator=(Memtable &memtable) = delete;
+  Memtable(Memtable &&other) noexcept;
   Memtable &operator=(Memtable &&memtable) noexcept;
+  ~Memtable();
   std::optional<Record> search(std::vector<std::byte> key);
   void insert(std::vector<std::byte> key, std::vector<std::byte> value,
               OperationRecord op, bool tombstone);

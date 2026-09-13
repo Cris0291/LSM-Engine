@@ -4,6 +4,8 @@
 #include <bit>
 #include <utility>
 
+Memtable::Memtable() : top(nullptr) {}
+
 Memtable::Memtable(uint32_t _seed) : seed(_seed), rng(seed) {
   Node *node{new Node(MAX_HEIGHT)};
   top = node;
@@ -17,6 +19,14 @@ Memtable::~Memtable() {
     top = temp;
   }
 };
+
+Memtable::Memtable(Memtable &&other) noexcept
+    : top(nullptr), seed(other.seed), rng(other.seed) {
+  std::swap(this->top, other.top);
+  std::swap(this->current_height, other.current_height);
+  std::swap(this->total_byte_count, other.total_byte_count);
+  std::swap(this->total_node_count, other.total_node_count);
+}
 
 Memtable &Memtable::operator=(Memtable &&memtable) noexcept {
   if (this == &memtable) {

@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <fcntl.h>
-#include <filesystem>
 #include <format>
 #include <memory>
 #include <random>
@@ -23,27 +22,27 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
                      MemoryUnit unit)
     : dir(dir_path), memtable(generate_seed()), size_threshold(threshold),
       memory_unit(unit) {
-  bool dir_exists{std::filesystem::exists(dir_path)};
-  bool is_dir{std::filesystem::is_directory(dir_path)};
+  bool dir_exists{std::filesystem::exists(dir)};
+  bool is_dir{std::filesystem::is_directory(dir)};
 
   if (dir_exists && !is_dir) {
     throw std::runtime_error("path is not a directory");
   }
 
   if (!dir_exists) {
-    bool is_created{std::filesystem::create_directory(dir_path)};
+    bool is_created{std::filesystem::create_directory(dir)};
     if (!is_created) {
       throw std::runtime_error("directory could not be created");
     }
   }
 
-  fsync_dir(dir);
+  fsync_dir(dir.string());
 
-  std::string flock_path{dir_path + LOCK_PATH};
-  fd_flock = set_flock(flock_path);
+  std::filesystem::path flock_path{dir / LOCK_PATH};
+  fd_flock = set_flock(flock_path.string());
 
-  std::string wal_path{dir_path + WAL_PATH};
-  Wal _wal(dir_path.data(), wal_path.data());
+  std::filesystem::path wal_path{dir / WAL_PATH};
+  Wal _wal(dir.string().data(), wal_path.string().data());
   wal = std::move(_wal);
 
   if (wal.get_size() > 0) {
@@ -54,7 +53,7 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
     }
   }
 
-  std::string _sstable_dir{dir_path + SSTABLE_DIR};
+  std::filesystem::path _sstable_dir{dir / SSTABLE_DIR};
   if (!std::filesystem::exists(_sstable_dir)) {
     bool is_sstable_created{std::filesystem::create_directory(_sstable_dir)};
     if (!is_sstable_created) {
@@ -81,14 +80,14 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
     }
   }
 
+  sstable_count = records.size();
+
   if (records.size() > 1) {
     std::sort(records.begin(), records.end(),
               [](const std::unique_ptr<Sstable> &a,
                  const std::unique_ptr<Sstable> &b) {
                 return a.get()->sstable_path < b.get()->sstable_path;
               });
-
-    sstable_count = records.size();
   }
 
   fsync_dir(sstable_dir);
@@ -97,15 +96,19 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
 std::optional<std::vector<std::byte>>
 LsmEngine::get(std::vector<std::byte> key) {
   std::optional<Record> memtabel_res{memtable.search(key)};
-  if (memtabel_res.has_value() &&
-      memtabel_res.value().op != OperationRecord::DELETE) {
+  if (memtabel_res.has_value()) {
+    if (memtabel_res.value().op == OperationRecord::DELETE) {
+      return {};
+    }
     return memtabel_res->value;
   }
 
   for (auto it{records.rbegin()}; it != records.rend(); it++) {
     std::optional<Record> sstable_res{it->get()->read(key)};
-    if (sstable_res.has_value() &&
-        memtabel_res.value().op != OperationRecord::DELETE) {
+    if (sstable_res.has_value()) {
+      if (memtabel_res.value().op == OperationRecord::DELETE) {
+        return {};
+      }
       return sstable_res->value;
     }
   }
@@ -123,9 +126,9 @@ void LsmEngine::put(std::vector<std::byte> key, std::vector<std::byte> value) {
 }
 
 void LsmEngine::delete_record(std::vector<std::byte> key) {
-  memtable.delete_node(key);
   std::vector<std::byte> value{};
   wal.append(OperationRecord::DELETE, key, value);
+  memtable.delete_node(key);
 
   if (surpass_threshold()) {
     flush_state();
@@ -150,7 +153,8 @@ std::size_t LsmEngine::bytes_convertion(std::size_t bytes) {
 std::string LsmEngine::create_path() {
   std::string sstable_file{std::format("sstable_{:06d}", sstable_count)};
   sstable_count += 1;
-  return sstable_dir + "/" + sstable_file;
+  std::filesystem::path sstable_path{sstable_dir / sstable_file};
+  return sstable_path.string();
 }
 
 std::uint32_t LsmEngine::generate_seed() {
