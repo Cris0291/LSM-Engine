@@ -21,7 +21,8 @@
 
 LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
                      MemoryUnit unit)
-    : memtable(generate_seed()), size_threshold(threshold), memory_unit(unit) {
+    : dir(dir_path), memtable(generate_seed()), size_threshold(threshold),
+      memory_unit(unit) {
   bool dir_exists{std::filesystem::exists(dir_path)};
   bool is_dir{std::filesystem::is_directory(dir_path)};
 
@@ -36,7 +37,7 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
     }
   }
 
-  dir = dir_path;
+  fsync_dir(dir);
 
   std::string flock_path{dir_path + LOCK_PATH};
   fd_flock = set_flock(flock_path);
@@ -89,18 +90,22 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
 
     sstable_count = records.size();
   }
+
+  fsync_dir(sstable_dir);
 }
 
 std::optional<std::vector<std::byte>>
 LsmEngine::get(std::vector<std::byte> key) {
-  std::optional<Memtable::Record> memtabel_res{memtable.search(key)};
-  if (memtabel_res.has_value()) {
+  std::optional<Record> memtabel_res{memtable.search(key)};
+  if (memtabel_res.has_value() &&
+      memtabel_res.value().op != OperationRecord::DELETE) {
     return memtabel_res->value;
   }
 
   for (auto it{records.rbegin()}; it != records.rend(); it++) {
-    std::optional<RecordSstable> sstable_res{it->get()->read(key)};
-    if (sstable_res.has_value()) {
+    std::optional<Record> sstable_res{it->get()->read(key)};
+    if (sstable_res.has_value() &&
+        memtabel_res.value().op != OperationRecord::DELETE) {
       return sstable_res->value;
     }
   }
@@ -164,13 +169,12 @@ bool LsmEngine::surpass_threshold() {
 
 void LsmEngine::flush_state() {
   std::string path{create_path()};
-  SstableWriter stable_writer{SstableWriter(path, sstable_dir)};
+  SstableWriter stable_writer{SstableWriter(path)};
   stable_writer.flush_memtable(memtable);
   records.push_back(std::make_unique<Sstable>(path));
 
   Memtable new_memtable{Memtable(generate_seed())};
-  std::destroy_at(&memtable);
-  std::construct_at(&memtable, std::move(new_memtable));
+  memtable = std::move(new_memtable);
   wal.reset();
 }
 
@@ -192,4 +196,17 @@ int LsmEngine::set_flock(std::string flock_path) {
     throw std::runtime_error("there was a problem locking the flock file");
   }
   return _fd_flock;
+}
+
+void LsmEngine::fsync_dir(std::string dir) {
+  int dir_fd{open(dir.data(), O_DIRECTORY)};
+  if (dir_fd == -1) {
+    throw std::runtime_error("directory could not be found");
+  }
+
+  if (fsync(dir_fd) == -1) {
+    throw std::runtime_error("error calling fsync");
+  }
+
+  close(dir_fd);
 }

@@ -1,6 +1,7 @@
 #include "wal.h"
 #include <cstddef>
 #include <cstdio>
+#include <stdexcept>
 #include <sys/types.h>
 #include <unistd.h>
 #include <utility>
@@ -12,15 +13,6 @@ Wal::Wal(const char *d_path, const char *f_path)
   fd = open(file_path, O_RDWR | O_CREAT, 0644);
   if (fd == -1)
     throw std::runtime_error("file could not be opened");
-
-  int dir_fd{open(directory_path, O_DIRECTORY)};
-  if (dir_fd == -1)
-    throw std::runtime_error("directory could not be found");
-
-  if (fsync(dir_fd) == -1)
-    throw std::runtime_error("error calling fsync");
-
-  close(dir_fd);
 }
 
 Wal::~Wal() { close(fd); }
@@ -274,15 +266,15 @@ std::vector<Record> Wal::replay_whole_file() {
 
 void Wal::reset() {
   if (ftruncate(fd, 0) == -1) {
-    // do soemthing still pending have to see how it matches the engine life
-    // cycle
+    throw std::runtime_error("file could not be truncated");
   }
 
   if (lseek(fd, 0, SEEK_SET) == -1) {
-    // same as before
+    throw std::runtime_error("file index could not be reset");
   }
 
   if (fsync(fd) == -1) {
+    throw std::runtime_error("file changes were not saved");
   }
 }
 

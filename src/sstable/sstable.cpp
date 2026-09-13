@@ -1,6 +1,5 @@
 #include "sstable.h"
 #include "lsm_utilities.h"
-#include "memtable.h"
 #include "sstable_operation.h"
 #include <cerrno>
 #include <cstddef>
@@ -64,8 +63,8 @@ Sstable::Sstable(std::string path) {
 
 Sstable::~Sstable() { close(fd); };
 
-std::vector<RecordSstable> Sstable::linera_iteration() {
-  std::vector<RecordSstable> res;
+std::vector<Record> Sstable::linera_iteration() {
+  std::vector<Record> res;
   std::size_t curr_size{};
   std::size_t block_size_offset{4};
   std::size_t start_pos{HEADER_SIZE};
@@ -97,12 +96,12 @@ std::vector<RecordSstable> Sstable::linera_iteration() {
 };
 
 void Sstable::parse_blocks(std::vector<std::byte> &records,
-                           std::vector<RecordSstable> &parsed_records,
+                           std::vector<Record> &parsed_records,
                            std::size_t size, std::size_t curr_size) {
   OperationRecord op{};
   std::uint32_t key_len{};
   std::uint32_t value_len{};
-  RecordSstable p_record{};
+  Record p_record{};
 
   while (curr_size < size) {
     op = static_cast<OperationRecord>(records[curr_size]);
@@ -130,7 +129,7 @@ void Sstable::parse_blocks(std::vector<std::byte> &records,
   }
 };
 
-std::optional<RecordSstable> Sstable::read(std::vector<std::byte> key) {
+std::optional<Record> Sstable::read(std::vector<std::byte> key) {
   std::size_t data_block_size{};
 
   std::size_t res{search_entry(index_entries, key)};
@@ -217,9 +216,8 @@ std::size_t Sstable::search_entry(const std::vector<IndexEntry> &entries,
   return res;
 };
 
-std::optional<RecordSstable>
-Sstable::search_records(std::vector<std::byte> &records,
-                        std::span<std::byte> key) {
+std::optional<Record> Sstable::search_records(std::vector<std::byte> &records,
+                                              std::span<std::byte> key) {
   std::size_t curr_size{12};
   std::uint32_t crc{from_n_bytes_little_endian<std::uint32_t, 4>(
       std::span<std::byte>{records}.subspan(0, 4))};
@@ -257,7 +255,7 @@ Sstable::search_records(std::vector<std::byte> &records,
   }
 
   if (comparison_res == 0) {
-    RecordSstable record{};
+    Record record{};
     record.op = static_cast<OperationRecord>(records[record_offset]);
     record_offset += OP_SIZE;
     record_offset += KEY_VALUE_SIZE * 2;

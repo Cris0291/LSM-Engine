@@ -23,15 +23,21 @@ struct DecodeResult {
 
 struct Record {
   OperationRecord op;
-  std::vector<std::byte> key;
-  std::vector<std::byte> value;
+  std::vector<std::byte> key{};
+  std::vector<std::byte> value{};
 
-  bool operator==(const Record &rhs) const = default;
+  Record() : op(OperationRecord::NO_OP) {}
+
+  Record(std::vector<std::byte> _key, std::vector<std::byte> _value,
+         OperationRecord _op)
+      : key(_key), value(_value), op(_op) {}
 
   Record(const DecodeResult &decode_result) : op(decode_result.op) {
     key.assign(decode_result.key.begin(), decode_result.key.end());
     value.assign(decode_result.value.begin(), decode_result.value.end());
   }
+
+  bool operator==(const Record &rhs) const = default;
 };
 
 enum class ReplayState { NEWSTATE, READ, RESIZE, DECODE, MOVE };

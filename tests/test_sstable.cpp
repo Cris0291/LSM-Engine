@@ -1,13 +1,12 @@
 #include "memtable.h"
+#include "operation.h"
 #include "sstable.h"
-#include "sstable_operation.h"
 #include "sstable_writer.h"
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <format>
 #include <gtest/gtest.h>
-#include <iostream>
 #include <optional>
 #include <string>
 #include <unistd.h>
@@ -58,14 +57,14 @@ static Memtable create_memtable() {
 
 TEST_F(SstableTest, RoundTrip) {
   // Arrange
-  SstableWriter sswriter{file_path, dir_path};
+  SstableWriter sswriter{file_path};
   Memtable memtable{create_memtable()};
-  std::vector<Memtable::Record> mem_records{memtable.linear_iteration()};
+  std::vector<Record> mem_records{memtable.linear_iteration()};
   sswriter.flush_memtable(memtable);
   Sstable ssreader{file_path};
 
   // Act
-  std::vector<RecordSstable> sstable_records{ssreader.linera_iteration()};
+  std::vector<Record> sstable_records{ssreader.linera_iteration()};
 
   // Assert
   EXPECT_EQ(mem_records.size(), sstable_records.size());
@@ -79,12 +78,12 @@ TEST_F(SstableTest, RoundTrip) {
 TEST_F(SstableTest, ReadRecord) {
   // Arrange
   std::size_t max_keys{10000};
-  SstableWriter sswriter{file_path, dir_path};
+  SstableWriter sswriter{file_path};
   Memtable memtable{create_memtable()};
-  std::vector<Memtable::Record> mem_records{memtable.linear_iteration()};
+  std::vector<Record> mem_records{memtable.linear_iteration()};
   sswriter.flush_memtable(memtable);
   Sstable ssreader{file_path};
-  std::optional<RecordSstable> res;
+  std::optional<Record> res;
 
   // Act
   for (int i{}; i < max_keys; i++) {
@@ -101,14 +100,14 @@ TEST_F(SstableTest, ReadRecord) {
 
 TEST_F(SstableTest, ReadNonExistentRecordBeforeFirst) {
   // Arrange
-  SstableWriter sswriter{file_path, dir_path};
+  SstableWriter sswriter{file_path};
   Memtable memtable{create_memtable()};
   sswriter.flush_memtable(memtable);
   Sstable ssreader{file_path};
   std::vector<std::byte> fake_key{bytes("aaa")};
 
   /// Act
-  std::optional<RecordSstable> res{ssreader.read(fake_key)};
+  std::optional<Record> res{ssreader.read(fake_key)};
 
   // Assert
   EXPECT_FALSE(res.has_value());
@@ -116,14 +115,14 @@ TEST_F(SstableTest, ReadNonExistentRecordBeforeFirst) {
 
 TEST_F(SstableTest, ReadNonExistentRecordAfterLast) {
   // Arrange
-  SstableWriter sswriter{file_path, dir_path};
+  SstableWriter sswriter{file_path};
   Memtable memtable{create_memtable()};
   sswriter.flush_memtable(memtable);
   Sstable ssreader{file_path};
   std::vector<std::byte> fake_key{bytes("zzz")};
 
   /// Act
-  std::optional<RecordSstable> res{ssreader.read(fake_key)};
+  std::optional<Record> res{ssreader.read(fake_key)};
 
   // Assert
   EXPECT_FALSE(res.has_value());
@@ -131,14 +130,14 @@ TEST_F(SstableTest, ReadNonExistentRecordAfterLast) {
 
 TEST_F(SstableTest, ReadNonExistentRecordBetweenKeys) {
   // Arrange
-  SstableWriter sswriter{file_path, dir_path};
+  SstableWriter sswriter{file_path};
   Memtable memtable{create_memtable()};
   sswriter.flush_memtable(memtable);
   Sstable ssreader{file_path};
   std::vector<std::byte> fake_key{bytes("key_00700_7")};
 
   /// Act
-  std::optional<RecordSstable> res{ssreader.read(fake_key)};
+  std::optional<Record> res{ssreader.read(fake_key)};
 
   // Assert
   EXPECT_FALSE(res.has_value());
@@ -146,7 +145,7 @@ TEST_F(SstableTest, ReadNonExistentRecordBetweenKeys) {
 
 TEST_F(SstableTest, ReadTombStone) {
   // Arrange
-  SstableWriter sswriter{file_path, dir_path};
+  SstableWriter sswriter{file_path};
   Memtable memtable{create_memtable()};
   std::vector<std::byte> tombstone_key{bytes("key_00700_7")};
   memtable.insert(tombstone_key, tombstone_key, OperationRecord::DELETE, true);
@@ -154,7 +153,7 @@ TEST_F(SstableTest, ReadTombStone) {
   Sstable ssreader{file_path};
 
   /// Act
-  std::optional<RecordSstable> res{ssreader.read(tombstone_key)};
+  std::optional<Record> res{ssreader.read(tombstone_key)};
 
   // Assert
   EXPECT_TRUE(res.has_value());

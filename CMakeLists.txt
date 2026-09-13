@@ -27,6 +27,7 @@ add_library(sstable_lib src/sstable/sstable.cpp src/sstable/sstable_writer.cpp)
 target_include_directories(sstable_lib PUBLIC src/sstable)
 target_link_libraries(sstable_lib PUBLIC memtable_lib)
 target_link_libraries(sstable_lib PUBLIC ZLIB::ZLIB)
+target_link_libraries(sstable_lib PUBLIC utility)
 
 add_library(engine_lib src/engine/LsmEngine.cpp)
 target_include_directories(engine_lib PUBLIC src/engine)
@@ -55,7 +56,7 @@ add_executable(memtable_tests tests/test_memtable.cpp)
 target_link_libraries(memtable_tests PRIVATE record_codec memtable_lib utility GTest::gtest_main)
 
 add_executable(sstable_tests tests/test_sstable.cpp)
-target_link_libraries(sstable_tests PRIVATE  sstable_lib memtable_lib GTest::gtest_main)
+target_link_libraries(sstable_tests PRIVATE  sstable_lib memtable_lib utility GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(codec_tests)

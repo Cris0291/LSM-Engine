@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <format>
 #include <gtest/gtest.h>
-#include <optional>
 #include <random>
 #include <string>
 
@@ -161,7 +160,7 @@ TEST(MemtableTest, SearchKey) {
 
   // Act
   memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
-  std::optional<Memtable::Record> node{memtable.search(bytes_key1)};
+  std::optional<Record> node{memtable.search(bytes_key1)};
   // Assert
   EXPECT_TRUE(node.has_value());
   EXPECT_EQ(bytes_key1, node->key);
@@ -180,8 +179,8 @@ TEST(MemtableTest, SearchKeyAndNotFoundKey) {
 
   // Act
   memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
-  std::optional<Memtable::Record> node{memtable.search(bytes_key1)};
-  std::optional<Memtable::Record> node1{memtable.search(bytes_key2)};
+  std::optional<Record> node{memtable.search(bytes_key1)};
+  std::optional<Record> node1{memtable.search(bytes_key2)};
 
   // Assert
   EXPECT_TRUE(node.has_value());
@@ -241,13 +240,12 @@ TEST(MemtableTest, InsertOverrideValue) {
   memtable.insert(bytes_key2, bytes_key2, OperationRecord::PUT, false);
   memtable.insert(bytes_key3, bytes_key3, OperationRecord::PUT, false);
 
-  std::optional<Memtable::Record> node_key1{memtable.search(bytes_key1)};
+  std::optional<Record> node_key1{memtable.search(bytes_key1)};
   auto records{memtable.linear_iteration()};
 
   memtable.insert(bytes_key1, bytes_key4, OperationRecord::PUT, false);
 
-  std::optional<Memtable::Record> node_key1_updated{
-      memtable.search(bytes_key1)};
+  std::optional<Record> node_key1_updated{memtable.search(bytes_key1)};
   auto records_updated{memtable.linear_iteration()};
 
   // Arrange
@@ -266,11 +264,10 @@ TEST(MemtableTest, DeleteNode) {
 
   // Act
   memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
-  std::optional<Memtable::Record> node_key1{memtable.search(bytes_key1)};
+  std::optional<Record> node_key1{memtable.search(bytes_key1)};
 
   memtable.delete_node(bytes_key1);
-  std::optional<Memtable::Record> node_key1_deleted{
-      memtable.search(bytes_key1)};
+  std::optional<Record> node_key1_deleted{memtable.search(bytes_key1)};
 
   // Assert
   EXPECT_EQ(node_key1->key, bytes_key1);
@@ -289,8 +286,7 @@ TEST(MemtableTest, DeleteNonExistingNode) {
 
   // Act
   memtable.delete_node(bytes_key1);
-  std::optional<Memtable::Record> node_key1_deleted{
-      memtable.search(bytes_key1)};
+  std::optional<Record> node_key1_deleted{memtable.search(bytes_key1)};
 
   // Assert
   EXPECT_EQ(node_key1_deleted->key, bytes_key1);

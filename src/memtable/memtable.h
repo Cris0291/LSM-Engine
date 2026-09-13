@@ -1,23 +1,17 @@
 #pragma once
 
 #include "node.h"
+#include "operation.h"
 #include <cstdint>
 #include <cstring>
 #include <optional>
 #include <random>
 
 class Memtable {
-public:
-  struct Record {
-    std::vector<std::byte> key;
-    std::vector<std::byte> value;
-    OperationRecord op;
-  };
-
 private:
   static constexpr int MAX_HEIGHT{32};
   static constexpr int OP_SIZE{1};
-  const uint32_t seed;
+  uint32_t seed;
   int current_height{0};
   Node *top;
   std::mt19937 rng;
@@ -32,6 +26,7 @@ public:
   std::size_t total_byte_count;
   ~Memtable();
   Memtable(uint32_t _seed);
+  Memtable &operator=(Memtable &&memtable) noexcept;
   std::optional<Record> search(std::vector<std::byte> key);
   void insert(std::vector<std::byte> key, std::vector<std::byte> value,
               OperationRecord op, bool tombstone);

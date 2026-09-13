@@ -1,36 +1,28 @@
 #include "sstable_writer.h"
+#include "operation.h"
+#include "sstable.h"
 #include "zlib.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
+#include <iterator>
 #include <stdexcept>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
-SstableWriter::SstableWriter(std::string path, std::string dir) {
+SstableWriter::SstableWriter(std::string path) {
   fd = open(path.data(), O_RDWR | O_CREAT | O_TRUNC, 0644);
   if (fd == -1) {
     throw std::runtime_error("could not create the file for sstable write");
   }
-
-  int dir_fd{open(dir.data(), O_DIRECTORY)};
-  if (fd == -1) {
-    throw std::runtime_error("directory could not be found");
-  }
-
-  if (fsync(dir_fd) == -1) {
-    throw std::runtime_error("error calling fsync");
-  }
-
-  close(dir_fd);
 };
 
 SstableWriter::~SstableWriter() { close(fd); };
 
 void SstableWriter::create_blocks(
-    std::vector<Memtable::Record> &records,
+    std::vector<Record> &records,
     std::vector<std::vector<std::byte>> &data_blocks,
     std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
         &index_blocks) {
@@ -165,9 +157,7 @@ void SstableWriter::write_sstable(std::vector<std::vector<std::byte>> &data,
   }
 };
 
-void SstableWriter::flush_memtable(Memtable &memtable) {
-  std::vector<Memtable::Record> records{memtable.linear_iteration()};
-
+void SstableWriter::create_sstable_writer(std::vector<Record> &records) {
   std::vector<std::vector<std::byte>> data_blocks;
   std::vector<std::vector<std::byte>> index;
   std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
@@ -185,7 +175,26 @@ void SstableWriter::flush_memtable(Memtable &memtable) {
   to_4_bytes_little_endian(MAGIC, footer);
 
   write_sstable(data_blocks, index, footer);
+}
+
+void SstableWriter::flush_memtable(Memtable &memtable) {
+  std::vector<Record> records{memtable.linear_iteration()};
+  create_sstable_writer(records);
 };
+
+void SstableWriter::merge_sstables(
+    std::initializer_list<std::reference_wrapper<Sstable>> reader_list) {
+  std::vector<Record> records;
+
+  for (auto &ref_wrapper : reader_list) {
+    Sstable &sstable{ref_wrapper.get()};
+    std::vector<Record> record{sstable.linera_iteration()};
+    records.insert(records.end(), std::make_move_iterator(record.begin()),
+                   std::make_move_iterator(record.end()));
+  }
+
+  create_sstable_writer(records);
+}
 
 void SstableWriter::to_4_bytes_little_endian(std::size_t value,
                                              std::vector<std::byte> &bytes) {

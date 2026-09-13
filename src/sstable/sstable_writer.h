@@ -1,7 +1,12 @@
+#pragma once
+
 #include "memtable.h"
+#include "sstable.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <initializer_list>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -20,7 +25,7 @@ private:
   static constexpr std::uint32_t MAGIC{'SST1'};
   int fd;
   void create_blocks(
-      std::vector<Memtable::Record> &records,
+      std::vector<Record> &records,
       std::vector<std::vector<std::byte>> &data_blocks,
       std::vector<std::tuple<std::size_t, std::size_t, std::vector<std::byte>>>
           &index_blocks);
@@ -39,9 +44,12 @@ private:
   void write_sstable(std::vector<std::vector<std::byte>> &data,
                      std::vector<std::vector<std::byte>> &index,
                      std::vector<std::byte> &footer);
+  void create_sstable_writer(std::vector<Record> &records);
 
 public:
-  SstableWriter(std::string path, std::string dir);
+  SstableWriter(std::string path);
   ~SstableWriter();
   void flush_memtable(Memtable &memtable);
+  void merge_sstables(
+      std::initializer_list<std::reference_wrapper<Sstable>> reader_list);
 };

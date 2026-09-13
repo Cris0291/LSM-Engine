@@ -1,5 +1,6 @@
 #pragma once
 
+#include "operation.h"
 #include "sstable_operation.h"
 #include <cstddef>
 #include <optional>
@@ -33,16 +34,16 @@ private:
   std::vector<IndexEntry> parse_index(std::vector<std::byte> &index);
   std::size_t search_entry(const std::vector<IndexEntry> &entries,
                            const std::vector<std::byte> &key);
-  std::optional<RecordSstable> search_records(std::vector<std::byte> &records,
-                                              std::span<std::byte> key);
+  std::optional<Record> search_records(std::vector<std::byte> &records,
+                                       std::span<std::byte> key);
   void parse_blocks(std::vector<std::byte> &records,
-                    std::vector<RecordSstable> &parsed_records,
-                    std::size_t size, std::size_t curr_size);
+                    std::vector<Record> &parsed_records, std::size_t size,
+                    std::size_t curr_size);
 
 public:
   std::string sstable_path;
   Sstable(std::string path);
   ~Sstable();
-  std::optional<RecordSstable> read(std::vector<std::byte> key);
-  std::vector<RecordSstable> linera_iteration();
+  std::optional<Record> read(std::vector<std::byte> key);
+  std::vector<Record> linera_iteration();
 };

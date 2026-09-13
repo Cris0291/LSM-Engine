@@ -32,6 +32,8 @@ private:
   bool surpass_threshold();
   void flush_state();
   int set_flock(std::string flock_path);
+  void fsync_dir(std::string dir);
+  void compact_records();
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);

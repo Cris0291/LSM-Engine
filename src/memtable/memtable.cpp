@@ -18,6 +18,21 @@ Memtable::~Memtable() {
   }
 };
 
+Memtable &Memtable::operator=(Memtable &&memtable) noexcept {
+  if (this == &memtable) {
+    return *this;
+  }
+
+  std::swap(this->seed, memtable.seed);
+  std::swap(this->current_height, memtable.current_height);
+  std::swap(this->top, memtable.top);
+  std::swap(this->rng, memtable.rng);
+  std::swap(this->total_node_count, memtable.total_node_count);
+  std::swap(this->total_byte_count, memtable.total_byte_count);
+
+  return *this;
+}
+
 Node *Memtable::search_for_node(const std::vector<std::byte> &key,
                                 std::vector<Node *> &update) {
   Node *temp{top};
@@ -70,7 +85,7 @@ Node *Memtable::search_for_node(const std::vector<std::byte> &key,
   return res;
 };
 
-std::optional<Memtable::Record> Memtable::search(std::vector<std::byte> key) {
+std::optional<Record> Memtable::search(std::vector<std::byte> key) {
   std::vector<Node *> update(MAX_HEIGHT, top);
   Node *res{search_for_node(key, update)};
 
@@ -137,7 +152,7 @@ int Memtable::random_height() {
   return height;
 };
 
-std::vector<Memtable::Record> Memtable::linear_iteration() {
+std::vector<Record> Memtable::linear_iteration() {
   Node *temp{top};
   std::vector<Record> records{};
   records.reserve(total_node_count);
@@ -166,7 +181,7 @@ std::string Memtable::to_str(std::vector<std::byte> bytes) {
   return s;
 };
 
-Memtable::Record Memtable::copy_node_to_record(Node *node) {
+Record Memtable::copy_node_to_record(Node *node) {
   Record record{node->key, node->value, node->op};
   return record;
 };
