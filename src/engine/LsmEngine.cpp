@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <fcntl.h>
 #include <format>
+#include <iostream>
 #include <memory>
 #include <random>
 #include <stdexcept>
@@ -100,16 +101,18 @@ LsmEngine::get(std::vector<std::byte> key) {
     if (memtabel_res.value().op == OperationRecord::DELETE) {
       return {};
     }
-    return memtabel_res->value;
+    return memtabel_res.value().value;
   }
 
   for (auto it{records.rbegin()}; it != records.rend(); it++) {
     std::optional<Record> sstable_res{it->get()->read(key)};
     if (sstable_res.has_value()) {
-      if (memtabel_res.value().op == OperationRecord::DELETE) {
+      std::cerr << "1" << "\n";
+      if (sstable_res.value().op == OperationRecord::DELETE) {
+        std::cerr << "2" << "\n";
         return {};
       }
-      return sstable_res->value;
+      return sstable_res.value().value;
     }
   }
 
@@ -119,8 +122,11 @@ LsmEngine::get(std::vector<std::byte> key) {
 void LsmEngine::put(std::vector<std::byte> key, std::vector<std::byte> value) {
   wal.append(OperationRecord::PUT, key, value);
   memtable.insert(key, value, OperationRecord::PUT, false);
+  std::optional<Record> res{memtable.search(key)};
+  std::cerr << "put :" << res.has_value() << "\n";
 
   if (surpass_threshold()) {
+    std::cerr << "threshold" << "\n";
     flush_state();
   }
 }
