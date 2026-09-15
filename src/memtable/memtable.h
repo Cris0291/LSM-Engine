@@ -23,7 +23,7 @@ private:
   static Record copy_node_to_record(Node *node);
 
 public:
-  std::size_t total_byte_count;
+  std::size_t total_byte_count{};
   Memtable();
   Memtable(uint32_t _seed);
   Memtable(Memtable &memtable) = delete;

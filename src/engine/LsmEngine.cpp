@@ -107,9 +107,7 @@ LsmEngine::get(std::vector<std::byte> key) {
   for (auto it{records.rbegin()}; it != records.rend(); it++) {
     std::optional<Record> sstable_res{it->get()->read(key)};
     if (sstable_res.has_value()) {
-      std::cerr << "1" << "\n";
       if (sstable_res.value().op == OperationRecord::DELETE) {
-        std::cerr << "2" << "\n";
         return {};
       }
       return sstable_res.value().value;
@@ -123,7 +121,6 @@ void LsmEngine::put(std::vector<std::byte> key, std::vector<std::byte> value) {
   wal.append(OperationRecord::PUT, key, value);
   memtable.insert(key, value, OperationRecord::PUT, false);
   std::optional<Record> res{memtable.search(key)};
-  std::cerr << "put :" << res.has_value() << "\n";
 
   if (surpass_threshold()) {
     std::cerr << "threshold" << "\n";
@@ -137,6 +134,7 @@ void LsmEngine::delete_record(std::vector<std::byte> key) {
   memtable.delete_node(key);
 
   if (surpass_threshold()) {
+    std::cerr << "threshold 2" << "\n";
     flush_state();
   }
 }
@@ -174,6 +172,9 @@ std::uint32_t LsmEngine::generate_seed() {
 
 bool LsmEngine::surpass_threshold() {
   std::size_t total_memory{bytes_convertion(memtable.total_byte_count)};
+  std::cerr << "inside thresh "
+            << "memtable bytes :" << memtable.total_byte_count
+            << "after conv: " << total_memory << "\n";
   return total_memory >= size_threshold;
 }
 
