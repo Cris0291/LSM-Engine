@@ -38,6 +38,7 @@ private:
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);
+  ~LsmEngine();
   std::optional<std::vector<std::byte>> get(std::vector<std::byte> key);
   void put(std::vector<std::byte> key, std::vector<std::byte> value);
   void delete_record(std::vector<std::byte> key);

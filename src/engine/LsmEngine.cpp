@@ -73,6 +73,7 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
       for (const auto &entry :
            std::filesystem::directory_iterator(sstable_dir)) {
         if (!entry.is_directory()) {
+          std::cerr << "dir iter" << "\n";
           records.push_back(std::make_unique<Sstable>(entry.path()));
         }
       }
@@ -84,6 +85,7 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
   sstable_count = records.size();
 
   if (records.size() > 1) {
+    std::cerr << "sort" << "\n";
     std::sort(records.begin(), records.end(),
               [](const std::unique_ptr<Sstable> &a,
                  const std::unique_ptr<Sstable> &b) {
@@ -94,6 +96,8 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
   fsync_dir(sstable_dir);
 }
 
+LsmEngine::~LsmEngine() { close(fd_flock); }
+
 std::optional<std::vector<std::byte>>
 LsmEngine::get(std::vector<std::byte> key) {
   std::optional<Record> memtabel_res{memtable.search(key)};
@@ -101,6 +105,7 @@ LsmEngine::get(std::vector<std::byte> key) {
     if (memtabel_res.value().op == OperationRecord::DELETE) {
       return {};
     }
+    std::cerr << "from memtable" << "\n";
     return memtabel_res.value().value;
   }
 
@@ -110,6 +115,7 @@ LsmEngine::get(std::vector<std::byte> key) {
       if (sstable_res.value().op == OperationRecord::DELETE) {
         return {};
       }
+      std::cerr << "from sstable" << "\n";
       return sstable_res.value().value;
     }
   }

@@ -125,3 +125,35 @@ TEST_F(EngineTest, PutFlushDeleteGetOperation) {
   EXPECT_FALSE(res_key1.has_value());
   EXPECT_EQ(res_key1, std::nullopt);
 }
+
+TEST_F(EngineTest, ReconstructOperation) {
+  // Arrange
+  std::size_t threshold{1};
+  MemoryUnit unit{MemoryUnit::B};
+  std::vector<std::byte> key1{bytes("key1")};
+  std::vector<std::byte> key2{bytes("key2")};
+  std::vector<std::byte> key3{bytes("key3")};
+  std::vector<std::byte> key4{bytes("key4")};
+  std::vector<std::byte> key5{bytes("key5")};
+  std::vector<std::byte> key6{bytes("key6")};
+  std::vector<std::byte> key7{bytes("key7")};
+
+  // Act
+  {
+    LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
+    engine.put(key1, key1);
+    engine.put(key2, key2);
+    engine.put(key3, key3);
+    engine.put(key4, key4);
+    engine.put(key5, key5);
+    engine.put(key6, key6);
+    engine.put(key7, key7);
+  }
+
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
+  auto res_key1{engine.get(key1)};
+
+  // Assert
+  EXPECT_TRUE(res_key1.has_value());
+  EXPECT_EQ(res_key1.value(), key1);
+}
