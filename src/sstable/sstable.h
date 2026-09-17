@@ -44,6 +44,9 @@ public:
   std::string sstable_path;
   Sstable(std::string path);
   ~Sstable();
+  struct Iterator {};
+  Iterator begin{};
+  Iterator end{};
   std::optional<Record> read(std::vector<std::byte> key);
   std::vector<Record> linera_iteration();
 };
