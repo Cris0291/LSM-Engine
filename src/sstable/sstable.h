@@ -2,6 +2,7 @@
 
 #include "operation.h"
 #include "sstable_operation.h"
+#include <climits>
 #include <cstddef>
 #include <optional>
 #include <span>
@@ -44,9 +45,21 @@ public:
   std::string sstable_path;
   Sstable(std::string path);
   ~Sstable();
-  struct Iterator {};
-  Iterator begin{};
-  Iterator end{};
+  struct Iterator {
+  private:
+    int curr_block{};
+    std::size_t block_size{};
+
+  public:
+    Iterator(int n);
+    Iterator &operator++();
+    Iterator operator++(int);
+    Iterator &operator--();
+    Iterator operator--(int);
+    Record operator*();
+  };
+  Iterator begin{0};
+  Iterator end{INT_MAX};
   std::optional<Record> read(std::vector<std::byte> key);
   std::vector<Record> linera_iteration();
 };

@@ -2,6 +2,7 @@
 #include "lsm_utilities.h"
 #include "sstable_operation.h"
 #include <cerrno>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -286,3 +287,10 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
 
   return ReadBlockResult::GOOD;
 };
+
+Sstable::Iterator::Iterator(int n) : curr_block(n) {
+  if (n == INT_MAX) {
+    return;
+  }
+  index_entries[n]
+}
