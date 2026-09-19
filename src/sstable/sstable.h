@@ -47,19 +47,27 @@ public:
   ~Sstable();
   struct Iterator {
   private:
+    Sstable *parent;
     int curr_block{};
+    std::size_t block_offset{};
     std::size_t block_size{};
+    std::vector<Record> records_buffer{};
+    std::size_t buffer_pos{};
+    Iterator(Sstable *_parent, int n, std::size_t size, std::size_t offset);
+    bool trigger_fill();
+    void fill_buffer(Sstable *parent);
+
+    friend class Sstable;
 
   public:
-    Iterator(int n);
     Iterator &operator++();
     Iterator operator++(int);
     Iterator &operator--();
     Iterator operator--(int);
     Record operator*();
   };
-  Iterator begin{0};
-  Iterator end{INT_MAX};
+  Iterator begin();
+  Iterator end();
   std::optional<Record> read(std::vector<std::byte> key);
   std::vector<Record> linera_iteration();
 };

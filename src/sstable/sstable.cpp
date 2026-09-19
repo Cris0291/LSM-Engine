@@ -288,9 +288,35 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
   return ReadBlockResult::GOOD;
 };
 
-Sstable::Iterator::Iterator(int n) : curr_block(n) {
-  if (n == INT_MAX) {
-    return;
+Sstable::Iterator Sstable::begin() {
+  Iterator it{Iterator(this, 0, index_entries[1].offset, 0)};
+  return it;
+}
+
+Sstable::Iterator Sstable::end() {
+  Iterator it{Iterator(this, index_entries.size(), INT_MAX, INT_MAX)};
+  return it;
+}
+
+bool Sstable::Iterator::trigger_fill() {
+  return records_buffer.size() == 0 || records_buffer.size() == buffer_pos;
+}
+
+void Sstable::Iterator::fill_buffer(Sstable *parent) {
+  // there is race condition here in case multiple operations try to
+  // access the shared state i case the iterator could be copied
+  if (records_buffer.size() > 0) {
+    records_buffer.clear();
   }
-  index_entries[n]
+  std::vector<std::byte> buffer{};
+  ReadBlockResult res{parent->read_block(buffer, block_size, block_offset)};
+
+  if (res == ReadBlockResult::ERROR) {
+    throw std::runtime_error(
+        "something went wrong while reading the data block");
+  }
+
+  std::size_t total_size_without_header{buffer.size() - HEADER_SIZE};
+  parent->parse_blocks(buffer, records_buffer, total_size_without_header,
+                       HEADER_SIZE);
 }
