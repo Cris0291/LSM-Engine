@@ -1,5 +1,6 @@
 #include "sstable.h"
 #include "lsm_utilities.h"
+#include "operation.h"
 #include "sstable_operation.h"
 #include <cerrno>
 #include <climits>
@@ -7,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -288,21 +290,87 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
   return ReadBlockResult::GOOD;
 };
 
+Sstable::Iterator::Iterator(std::shared_ptr<Sstable> _parent, int n,
+                            std::size_t size)
+    : parent(_parent), curr_block(n), block_size(size) {
+  if (size != INT_MAX)
+    fill_buffer(parent);
+}
+
+Sstable::Iterator::Iterator(const Iterator &other)
+    : Iterator(other.parent, other.curr_block, INT_MAX) {
+  block_size = other.block_size;
+  block_offset = other.block_offset;
+  buffer_pos = other.buffer_pos;
+  records_buffer = other.records_buffer;
+}
+
 Sstable::Iterator Sstable::begin() {
-  Iterator it{Iterator(this, 0, index_entries[1].offset, 0)};
+  // here we should handle the edge case in which there
+  // is only one block instead of seaching for the difference of block 0 againt
+  // block 1 the difference between block 0 and index must be used
+  std::size_t block_0_size{index_entries.size() > 1 ? index_entries[1].offset
+                                                    : index_offset};
+  Iterator it{Iterator(std::make_shared<Sstable>(this), 0, block_0_size)};
   return it;
 }
 
 Sstable::Iterator Sstable::end() {
-  Iterator it{Iterator(this, index_entries.size(), INT_MAX, INT_MAX)};
+  Iterator it{
+      Iterator(std::make_shared<Sstable>(this), index_entries.size(), INT_MAX)};
   return it;
 }
 
-bool Sstable::Iterator::trigger_fill() {
-  return records_buffer.size() == 0 || records_buffer.size() == buffer_pos;
+Sstable::Iterator &Sstable::Iterator::operator++() {
+  if (trigger_fill()) {
+    fill_buffer(parent);
+    curr_block += 1;
+    block_offset = parent.get()->index_entries[curr_block].offset;
+    block_size =
+        parent.get()->index_entries[++curr_block].offset - block_offset;
+    buffer_pos = 1;
+  } else {
+    buffer_pos += 1;
+  }
+
+  return *this;
 }
 
-void Sstable::Iterator::fill_buffer(Sstable *parent) {
+Sstable::Iterator Sstable::Iterator::operator++(int) {
+  Iterator it{Iterator(*this)};
+
+  if (trigger_fill()) {
+    fill_buffer(parent);
+    curr_block += 1;
+    block_offset = parent.get()->index_entries[curr_block].offset;
+    block_size =
+        parent.get()->index_entries[++curr_block].offset - block_offset;
+    buffer_pos = 1;
+  } else {
+    buffer_pos += 1;
+  }
+
+  return it;
+}
+
+Record Sstable::Iterator::operator*() {
+  if (trigger_fill()) {
+    fill_buffer(parent);
+    curr_block += 1;
+    block_offset = parent.get()->index_entries[curr_block].offset;
+    block_size =
+        parent.get()->index_entries[++curr_block].offset - block_offset;
+    buffer_pos = 0;
+  }
+
+  return records_buffer[buffer_pos];
+}
+
+bool Sstable::Iterator::trigger_fill() {
+  return records_buffer.size() == buffer_pos;
+}
+
+void Sstable::Iterator::fill_buffer(std::shared_ptr<Sstable> parent) {
   // there is race condition here in case multiple operations try to
   // access the shared state i case the iterator could be copied
   if (records_buffer.size() > 0) {

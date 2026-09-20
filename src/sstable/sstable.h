@@ -4,6 +4,7 @@
 #include "sstable_operation.h"
 #include <climits>
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -47,23 +48,22 @@ public:
   ~Sstable();
   struct Iterator {
   private:
-    Sstable *parent;
-    int curr_block{};
+    std::shared_ptr<Sstable> parent;
+    std::size_t curr_block{};
     std::size_t block_offset{};
     std::size_t block_size{};
     std::vector<Record> records_buffer{};
     std::size_t buffer_pos{};
-    Iterator(Sstable *_parent, int n, std::size_t size, std::size_t offset);
+    Iterator(std::shared_ptr<Sstable> _parent, int n, std::size_t size);
+    Iterator(const Iterator &other);
     bool trigger_fill();
-    void fill_buffer(Sstable *parent);
+    void fill_buffer(std::shared_ptr<Sstable> parent);
 
     friend class Sstable;
 
   public:
     Iterator &operator++();
     Iterator operator++(int);
-    Iterator &operator--();
-    Iterator operator--(int);
     Record operator*();
   };
   Iterator begin();
