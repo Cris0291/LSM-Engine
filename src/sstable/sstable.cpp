@@ -292,13 +292,11 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
 
 Sstable::Iterator::Iterator(std::shared_ptr<Sstable> _parent, int n,
                             std::size_t size)
-    : parent(_parent), curr_block(n), block_size(size) {
-  if (size != INT_MAX)
-    fill_buffer(parent);
-}
+    : parent(_parent), curr_block(n), block_size(size) {}
 
-Sstable::Iterator::Iterator(const Iterator &other)
-    : Iterator(other.parent, other.curr_block, INT_MAX) {
+Sstable::Iterator::Iterator(const Iterator &other) {
+  parent = other.parent;
+  curr_block = other.curr_block;
   block_size = other.block_size;
   block_offset = other.block_offset;
   buffer_pos = other.buffer_pos;
@@ -311,26 +309,32 @@ Sstable::Iterator Sstable::begin() {
   // block 1 the difference between block 0 and index must be used
   std::size_t block_0_size{index_entries.size() > 1 ? index_entries[1].offset
                                                     : index_offset};
-  Iterator it{Iterator(std::make_shared<Sstable>(this), 0, block_0_size)};
+  Iterator it{Iterator(shared_from_this(), 0, block_0_size)};
+  it.fill_buffer(it.parent);
   return it;
 }
 
 Sstable::Iterator Sstable::end() {
-  Iterator it{
-      Iterator(std::make_shared<Sstable>(this), index_entries.size(), INT_MAX)};
+  Iterator it{Iterator(shared_from_this(), index_entries.size(), INT_MAX)};
   return it;
 }
 
 Sstable::Iterator &Sstable::Iterator::operator++() {
+  buffer_pos += 1;
   if (trigger_fill()) {
-    fill_buffer(parent);
     curr_block += 1;
+    if (curr_block == parent.get()->index_entries.size()) {
+      buffer_pos = 0;
+      records_buffer.clear();
+      return *this;
+    }
+    fill_buffer(parent);
     block_offset = parent.get()->index_entries[curr_block].offset;
-    block_size =
-        parent.get()->index_entries[++curr_block].offset - block_offset;
-    buffer_pos = 1;
-  } else {
-    buffer_pos += 1;
+    std::size_t next{curr_block + 1};
+    block_size = next < parent.get()->index_entries.size()
+                     ? parent.get()->index_entries[next].offset - block_offset
+                     : parent.get()->index_offset - block_offset;
+    buffer_pos = 0;
   }
 
   return *this;
@@ -339,31 +343,35 @@ Sstable::Iterator &Sstable::Iterator::operator++() {
 Sstable::Iterator Sstable::Iterator::operator++(int) {
   Iterator it{Iterator(*this)};
 
+  buffer_pos += 1;
   if (trigger_fill()) {
-    fill_buffer(parent);
     curr_block += 1;
+    if (curr_block == parent.get()->index_entries.size()) {
+      buffer_pos = 0;
+      records_buffer.clear();
+      return *this;
+    }
+    fill_buffer(parent);
     block_offset = parent.get()->index_entries[curr_block].offset;
-    block_size =
-        parent.get()->index_entries[++curr_block].offset - block_offset;
-    buffer_pos = 1;
-  } else {
-    buffer_pos += 1;
+    std::size_t next{curr_block + 1};
+    block_size = next < parent.get()->index_entries.size()
+                     ? parent.get()->index_entries[next].offset - block_offset
+                     : parent.get()->index_offset - block_offset;
+    buffer_pos = 0;
   }
 
   return it;
 }
 
-Record Sstable::Iterator::operator*() {
-  if (trigger_fill()) {
-    fill_buffer(parent);
-    curr_block += 1;
-    block_offset = parent.get()->index_entries[curr_block].offset;
-    block_size =
-        parent.get()->index_entries[++curr_block].offset - block_offset;
-    buffer_pos = 0;
-  }
+Record Sstable::Iterator::operator*() { return records_buffer[buffer_pos]; }
 
-  return records_buffer[buffer_pos];
+bool Sstable::Iterator::operator==(const Iterator &other) const {
+  return (parent == other.parent && curr_block == other.curr_block &&
+          buffer_pos == other.buffer_pos);
+}
+
+bool Sstable::Iterator::operator!=(const Iterator &other) const {
+  return !(*this == other);
 }
 
 bool Sstable::Iterator::trigger_fill() {

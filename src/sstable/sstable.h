@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-class Sstable {
+class Sstable : public std::enable_shared_from_this<Sstable> {
 private:
   static constexpr std::size_t FOOTER_SIZE{20};
   static constexpr std::size_t HEADER_SIZE{12};
@@ -65,6 +65,8 @@ public:
     Iterator &operator++();
     Iterator operator++(int);
     Record operator*();
+    bool operator==(const Iterator &other) const;
+    bool operator!=(const Iterator &other) const;
   };
   Iterator begin();
   Iterator end();
