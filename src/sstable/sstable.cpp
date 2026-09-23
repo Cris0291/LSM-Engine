@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
+#include <iostream>
 #include <memory>
 #include <span>
 #include <stdexcept>
@@ -282,6 +283,9 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
       return ReadBlockResult::GOOD;
     }
     if (read_result < 0) {
+      std::cerr << "pread failed " << "fd" << fd << "errno" << errno
+                << "size :" << size << "offset: " << offset
+                << "fiel size: " << file_size << strerror(errno) << "\n";
       return ReadBlockResult::ERROR;
     }
     block_result += read_result;
@@ -328,12 +332,12 @@ Sstable::Iterator &Sstable::Iterator::operator++() {
       records_buffer.clear();
       return *this;
     }
-    fill_buffer(parent);
     block_offset = parent.get()->index_entries[curr_block].offset;
     std::size_t next{curr_block + 1};
     block_size = next < parent.get()->index_entries.size()
                      ? parent.get()->index_entries[next].offset - block_offset
                      : parent.get()->index_offset - block_offset;
+    fill_buffer(parent);
     buffer_pos = 0;
   }
 
@@ -351,12 +355,12 @@ Sstable::Iterator Sstable::Iterator::operator++(int) {
       records_buffer.clear();
       return *this;
     }
-    fill_buffer(parent);
     block_offset = parent.get()->index_entries[curr_block].offset;
     std::size_t next{curr_block + 1};
     block_size = next < parent.get()->index_entries.size()
                      ? parent.get()->index_entries[next].offset - block_offset
                      : parent.get()->index_offset - block_offset;
+    fill_buffer(parent);
     buffer_pos = 0;
   }
 
@@ -384,12 +388,13 @@ void Sstable::Iterator::fill_buffer(std::shared_ptr<Sstable> parent) {
   if (records_buffer.size() > 0) {
     records_buffer.clear();
   }
-  std::vector<std::byte> buffer{};
-  ReadBlockResult res{parent->read_block(buffer, block_size, block_offset)};
+
+  std::vector<std::byte> buffer(block_size);
+  ReadBlockResult res{
+      parent.get()->read_block(buffer, block_size, block_offset)};
 
   if (res == ReadBlockResult::ERROR) {
-    throw std::runtime_error(
-        "something went wrong while reading the data block");
+    throw std::runtime_error("iterator failed");
   }
 
   std::size_t total_size_without_header{buffer.size() - HEADER_SIZE};

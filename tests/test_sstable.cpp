@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <format>
 #include <gtest/gtest.h>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unistd.h>
@@ -159,4 +160,25 @@ TEST_F(SstableTest, ReadTombStone) {
   EXPECT_TRUE(res.has_value());
   EXPECT_EQ(res->key, tombstone_key);
   EXPECT_EQ(res->op, OperationRecord::DELETE);
+}
+
+TEST_F(SstableTest, IteratorOracleTest) {
+  // Arrange
+  SstableWriter sswriter{file_path};
+  Memtable memtable{create_memtable()};
+  sswriter.flush_memtable(memtable);
+  std::shared_ptr<Sstable> ssreader{std::make_shared<Sstable>(file_path)};
+  Sstable::Iterator it{ssreader.get()->begin()};
+
+  // Act
+  std::vector<Record> records{ssreader.get()->linera_iteration()};
+
+  // Assert
+  for (int i{}; i < records.size(); i++) {
+
+    EXPECT_EQ(records[i].key, (*it).key);
+    EXPECT_EQ(records[i].value, (*it).value);
+    EXPECT_EQ(records[i].op, (*it).op);
+    ++it;
+  }
 }
