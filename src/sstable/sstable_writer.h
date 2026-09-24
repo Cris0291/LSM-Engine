@@ -1,6 +1,7 @@
 #pragma once
 
 #include "memtable.h"
+#include "operation.h"
 #include "sstable.h"
 #include <array>
 #include <cstddef>
@@ -47,6 +48,8 @@ private:
   void create_sstable_writer(std::vector<Record> &records);
 
 public:
+  Record min_key;
+  Record max_key;
   SstableWriter(std::string path);
   ~SstableWriter();
   void flush_memtable(Memtable &memtable);

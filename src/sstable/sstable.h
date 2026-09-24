@@ -43,8 +43,10 @@ private:
                     std::size_t curr_size);
 
 public:
+  Record min_key;
+  Record max_key;
   std::string sstable_path;
-  Sstable(std::string path);
+  Sstable(std::string path, Record _min_key, Record _max_key);
   ~Sstable();
   struct Iterator {
   private:
