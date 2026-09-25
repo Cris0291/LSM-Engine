@@ -17,7 +17,8 @@
 #include <unistd.h>
 #include <utility>
 
-Sstable::Sstable(std::string path, Record _min_key, Record _max_key)
+Sstable::Sstable(std::string path, std::vector<std::byte> _min_key,
+                 std::vector<std::byte> _max_key)
     : max_key(_max_key), min_key(_min_key) {
   fd = open(path.data(), O_RDONLY);
   if (fd == -1) {

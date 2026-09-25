@@ -179,8 +179,8 @@ void SstableWriter::create_sstable_writer(std::vector<Record> &records) {
 
 void SstableWriter::flush_memtable(Memtable &memtable) {
   std::vector<Record> records{memtable.linear_iteration()};
-  min_key = records[0];
-  max_key = records.back();
+  min_key = records[0].key;
+  max_key = records.back().key;
   create_sstable_writer(records);
 };
 

@@ -105,19 +105,20 @@ LsmEngine::get(std::vector<std::byte> key) {
     if (memtabel_res.value().op == OperationRecord::DELETE) {
       return {};
     }
-    std::cerr << "from memtable" << "\n";
     return memtabel_res.value().value;
   }
 
-  for (auto it{records.rbegin()}; it != records.rend(); it++) {
+  for (auto it{records[0].rbegin()}; it != records[0].rend(); it++) {
     std::optional<Record> sstable_res{it->get()->read(key)};
     if (sstable_res.has_value()) {
       if (sstable_res.value().op == OperationRecord::DELETE) {
         return {};
       }
-      std::cerr << "from sstable" << "\n";
       return sstable_res.value().value;
     }
+  }
+
+  for (int i{1}; i < records.size(); i++) {
   }
 
   return {};
@@ -129,7 +130,6 @@ void LsmEngine::put(std::vector<std::byte> key, std::vector<std::byte> value) {
   std::optional<Record> res{memtable.search(key)};
 
   if (surpass_threshold()) {
-    std::cerr << "threshold" << "\n";
     flush_state();
   }
 }
@@ -178,9 +178,6 @@ std::uint32_t LsmEngine::generate_seed() {
 
 bool LsmEngine::surpass_threshold() {
   std::size_t total_memory{bytes_convertion(memtable.total_byte_count)};
-  std::cerr << "inside thresh "
-            << "memtable bytes :" << memtable.total_byte_count
-            << "after conv: " << total_memory << "\n";
   return total_memory >= size_threshold;
 }
 
@@ -188,7 +185,8 @@ void LsmEngine::flush_state() {
   std::string path{create_path()};
   SstableWriter stable_writer{SstableWriter(path)};
   stable_writer.flush_memtable(memtable);
-  records.push_back(std::make_unique<Sstable>(path));
+  records[0].push_back(std::make_unique<Sstable>(path, stable_writer.min_key,
+                                                 stable_writer.min_key));
 
   Memtable new_memtable{Memtable(generate_seed())};
   memtable = std::move(new_memtable);
@@ -226,4 +224,17 @@ void LsmEngine::fsync_dir(std::string dir) {
   }
 
   close(dir_fd);
+}
+
+std::shared_ptr<Sstable>
+LsmEngine::binary_search(const std::vector<std::byte> &key,
+                         const std::vector<std::shared_ptr<Sstable>> &level) {
+  std::size_t low{0};
+  std::size_t high{level.size() - 1};
+  std::size_t res{};
+
+  while (low < high) {
+    std::size_t mid = low + (high - low) / 2;
+    if ()
+  }
 }

@@ -24,7 +24,7 @@ private:
   std::filesystem::path dir;
   std::filesystem::path sstable_dir;
   std::uint32_t sstable_count{0};
-  std::vector<std::unique_ptr<Sstable>> records;
+  std::vector<std::vector<std::unique_ptr<Sstable>>> records;
   Memtable memtable;
   Wal wal;
   std::size_t bytes_convertion(std::size_t bytes);
@@ -35,6 +35,9 @@ private:
   int set_flock(std::string flock_path);
   void fsync_dir(std::string dir);
   void compact_records();
+  std::shared_ptr<Sstable>
+  binary_search(const std::vector<std::byte> &key,
+                const std::vector<std::shared_ptr<Sstable>> &level);
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);

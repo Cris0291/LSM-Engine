@@ -48,8 +48,8 @@ private:
   void create_sstable_writer(std::vector<Record> &records);
 
 public:
-  Record min_key;
-  Record max_key;
+  std::vector<std::byte> min_key;
+  std::vector<std::byte> max_key;
   SstableWriter(std::string path);
   ~SstableWriter();
   void flush_memtable(Memtable &memtable);
