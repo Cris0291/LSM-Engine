@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+// #include <getst/gtest_prod.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -15,6 +16,7 @@
 
 class LsmEngine {
 private:
+  static constexpr std::size_t LEVELS{4};
   const std::string LOCK_PATH{"LOCK"};
   const std::string WAL_PATH{"wal.log"};
   const std::string SSTABLE_DIR{"sstable"};
@@ -24,7 +26,7 @@ private:
   std::filesystem::path dir;
   std::filesystem::path sstable_dir;
   std::uint32_t sstable_count{0};
-  std::vector<std::vector<std::unique_ptr<Sstable>>> records;
+  std::vector<std::vector<std::shared_ptr<Sstable>>> records;
   Memtable memtable;
   Wal wal;
   std::size_t bytes_convertion(std::size_t bytes);
@@ -36,8 +38,12 @@ private:
   void fsync_dir(std::string dir);
   void compact_records();
   std::shared_ptr<Sstable>
-  binary_search(const std::vector<std::byte> &key,
-                const std::vector<std::shared_ptr<Sstable>> &level);
+  search_level(const std::vector<std::byte> &key,
+               const std::vector<std::shared_ptr<Sstable>> &level);
+  void add_to_level(std::size_t level, const std::shared_ptr<Sstable> &&table);
+  void remove_from_level(std::size_t level, std::size_t index);
+  void sort_level(std::vector<std::shared_ptr<Sstable>> &level);
+  // FRIEND_TEST(EngineTest, AddToLevel);
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);

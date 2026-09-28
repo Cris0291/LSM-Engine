@@ -35,6 +35,7 @@ target_link_libraries(engine_lib PUBLIC memtable_lib)
 target_link_libraries(engine_lib PUBLIC wal_lib)
 target_link_libraries(engine_lib PUBLIC sstable_lib)
 target_link_libraries(engine_lib PUBLIC utility)
+target_link_libraries(engine_lib PRIVATE ${googletest_SOURCE_DIR}/googletest/include)
 
 include(FetchContent)
 FetchContent_Declare(

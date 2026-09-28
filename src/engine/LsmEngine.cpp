@@ -1,5 +1,6 @@
 #include "LsmEngine.h"
 #include "engine_op.h"
+#include "lsm_utilities.h"
 #include "memtable.h"
 #include "operation.h"
 #include "sstable.h"
@@ -22,7 +23,7 @@
 LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
                      MemoryUnit unit)
     : dir(dir_path), memtable(generate_seed()), size_threshold(threshold),
-      memory_unit(unit) {
+      memory_unit(unit), records(LEVELS) {
   bool dir_exists{std::filesystem::exists(dir)};
   bool is_dir{std::filesystem::is_directory(dir)};
 
@@ -73,8 +74,10 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
       for (const auto &entry :
            std::filesystem::directory_iterator(sstable_dir)) {
         if (!entry.is_directory()) {
-          std::cerr << "dir iter" << "\n";
-          records.push_back(std::make_unique<Sstable>(entry.path()));
+          // for now push everything to level 0
+          records[0].push_back(
+              std::make_shared<Sstable>(entry.path(), std::vector<std::byte>{},
+                                        std::vector<std::byte>{}));
         }
       }
     } catch (const std::filesystem::filesystem_error &e) {
@@ -85,10 +88,9 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
   sstable_count = records.size();
 
   if (records.size() > 1) {
-    std::cerr << "sort" << "\n";
-    std::sort(records.begin(), records.end(),
-              [](const std::unique_ptr<Sstable> &a,
-                 const std::unique_ptr<Sstable> &b) {
+    std::sort(records[0].begin(), records[0].end(),
+              [](const std::shared_ptr<Sstable> &a,
+                 const std::shared_ptr<Sstable> &b) {
                 return a.get()->sstable_path < b.get()->sstable_path;
               });
   }
@@ -119,6 +121,17 @@ LsmEngine::get(std::vector<std::byte> key) {
   }
 
   for (int i{1}; i < records.size(); i++) {
+    std::shared_ptr<Sstable> res{search_level(key, records[i])};
+    if (res) {
+      std::optional<Record> sstable_res{res.get()->read(key)};
+      if (sstable_res.has_value()) {
+        if (sstable_res.value().op == OperationRecord::DELETE) {
+          return {};
+        }
+
+        return sstable_res.value().value;
+      }
+    }
   }
 
   return {};
@@ -185,7 +198,7 @@ void LsmEngine::flush_state() {
   std::string path{create_path()};
   SstableWriter stable_writer{SstableWriter(path)};
   stable_writer.flush_memtable(memtable);
-  records[0].push_back(std::make_unique<Sstable>(path, stable_writer.min_key,
+  records[0].push_back(std::make_shared<Sstable>(path, stable_writer.min_key,
                                                  stable_writer.min_key));
 
   Memtable new_memtable{Memtable(generate_seed())};
@@ -227,14 +240,39 @@ void LsmEngine::fsync_dir(std::string dir) {
 }
 
 std::shared_ptr<Sstable>
-LsmEngine::binary_search(const std::vector<std::byte> &key,
-                         const std::vector<std::shared_ptr<Sstable>> &level) {
+LsmEngine::search_level(const std::vector<std::byte> &key,
+                        const std::vector<std::shared_ptr<Sstable>> &level) {
   std::size_t low{0};
   std::size_t high{level.size() - 1};
-  std::size_t res{};
 
   while (low < high) {
     std::size_t mid = low + (high - low) / 2;
-    if ()
+    int low_comparison{compare_bytes(level[mid].get()->min_key, key)};
+    int high_comparison{compare_bytes(level[mid].get()->max_key, key)};
+    if (low_comparison < 0 && high_comparison < 0) {
+      low = mid + 1;
+    } else if (low_comparison > 0 && high_comparison > 0) {
+      high = mid - 1;
+    } else {
+      return level[mid];
+    }
   }
+  return nullptr;
+}
+
+void LsmEngine::add_to_level(std::size_t level,
+                             const std::shared_ptr<Sstable> &&table) {
+  records[level].push_back(std::move(table));
+  if (records[level].size() > 1) {
+    sort_level(records[level]);
+  }
+}
+
+void LsmEngine::sort_level(std::vector<std::shared_ptr<Sstable>> &level) {
+  std::sort(
+      level.begin(), level.end(),
+      [](const std::shared_ptr<Sstable> &a, const std::shared_ptr<Sstable> &b) {
+        int max_to_min{compare_bytes(a->max_key, b->min_key)};
+        return max_to_min < 0;
+      });
 }

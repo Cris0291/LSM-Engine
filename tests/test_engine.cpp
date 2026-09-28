@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <gtest/gtest_prod.h>
 #include <optional>
 #include <string>
 #include <system_error>
