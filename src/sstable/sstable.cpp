@@ -17,9 +17,7 @@
 #include <unistd.h>
 #include <utility>
 
-Sstable::Sstable(std::string path, std::vector<std::byte> _min_key,
-                 std::vector<std::byte> _max_key)
-    : max_key(_max_key), min_key(_min_key) {
+Sstable::Sstable(std::string path) {
   fd = open(path.data(), O_RDONLY);
   if (fd == -1) {
     throw std::runtime_error("sstable could not be found");
@@ -402,4 +400,11 @@ void Sstable::Iterator::fill_buffer(std::shared_ptr<Sstable> parent) {
   std::size_t total_size_without_header{buffer.size() - HEADER_SIZE};
   parent->parse_blocks(buffer, records_buffer, total_size_without_header,
                        HEADER_SIZE);
+}
+
+// this is a temporary method
+void Sstable::set_min_max(std::vector<std::byte> _min_key,
+                          std::vector<std::byte> _max_key) {
+  min_key = _min_key;
+  max_key = _max_key;
 }

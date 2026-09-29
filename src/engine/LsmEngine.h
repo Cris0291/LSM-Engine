@@ -7,7 +7,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-// #include <getst/gtest_prod.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -43,7 +42,7 @@ private:
   void add_to_level(std::size_t level, const std::shared_ptr<Sstable> &&table);
   void remove_from_level(std::size_t level, std::size_t index);
   void sort_level(std::vector<std::shared_ptr<Sstable>> &level);
-  // FRIEND_TEST(EngineTest, AddToLevel);
+  friend class EngineTest_LevelReadPath_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);

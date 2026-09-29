@@ -46,8 +46,7 @@ public:
   std::vector<std::byte> min_key;
   std::vector<std::byte> max_key;
   std::string sstable_path;
-  Sstable(std::string path, std::vector<std::byte> _min_key,
-          std::vector<std::byte> _max_key);
+  Sstable(std::string path);
   ~Sstable();
   struct Iterator {
   private:
@@ -75,4 +74,7 @@ public:
   Iterator end();
   std::optional<Record> read(std::vector<std::byte> key);
   std::vector<Record> linera_iteration();
+  // this method is temporary
+  void set_min_max(std::vector<std::byte> _min_key,
+                   std::vector<std::byte> _max_key);
 };

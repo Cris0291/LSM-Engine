@@ -75,9 +75,7 @@ LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
            std::filesystem::directory_iterator(sstable_dir)) {
         if (!entry.is_directory()) {
           // for now push everything to level 0
-          records[0].push_back(
-              std::make_shared<Sstable>(entry.path(), std::vector<std::byte>{},
-                                        std::vector<std::byte>{}));
+          records[0].push_back(std::make_shared<Sstable>(entry.path()));
         }
       }
     } catch (const std::filesystem::filesystem_error &e) {
@@ -143,6 +141,7 @@ void LsmEngine::put(std::vector<std::byte> key, std::vector<std::byte> value) {
   std::optional<Record> res{memtable.search(key)};
 
   if (surpass_threshold()) {
+    std::cerr << "flush l0" << "\n";
     flush_state();
   }
 }
@@ -198,8 +197,10 @@ void LsmEngine::flush_state() {
   std::string path{create_path()};
   SstableWriter stable_writer{SstableWriter(path)};
   stable_writer.flush_memtable(memtable);
-  records[0].push_back(std::make_shared<Sstable>(path, stable_writer.min_key,
-                                                 stable_writer.min_key));
+  // this will change later for now min max keys will be handled like this
+  auto sstable{std::make_shared<Sstable>(path)};
+  sstable.get()->set_min_max(stable_writer.min_key, stable_writer.max_key);
+  records[0].push_back(std::move(sstable));
 
   Memtable new_memtable{Memtable(generate_seed())};
   memtable = std::move(new_memtable);
