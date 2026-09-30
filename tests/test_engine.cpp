@@ -201,7 +201,9 @@ TEST_F(EngineTest, LevelReadPath) {
   memtable.insert(bytes_key2, bytes_key2, OperationRecord::PUT, false);
 
   SstableWriter sstable_writer{SstableWriter(sstable_file)};
+  sstable_writer.flush_memtable(memtable);
   auto sstable{std::make_shared<Sstable>(sstable_file)};
+  sstable->set_min_max(sstable_writer.min_key, sstable_writer.max_key);
 
   // Act
   engine.put(key1, key1);

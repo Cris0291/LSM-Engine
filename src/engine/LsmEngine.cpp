@@ -108,6 +108,8 @@ LsmEngine::get(std::vector<std::byte> key) {
     return memtabel_res.value().value;
   }
 
+  std::cerr << "after mem search" << "\n";
+
   for (auto it{records[0].rbegin()}; it != records[0].rend(); it++) {
     std::optional<Record> sstable_res{it->get()->read(key)};
     if (sstable_res.has_value()) {
@@ -118,19 +120,33 @@ LsmEngine::get(std::vector<std::byte> key) {
     }
   }
 
+  std::cerr << "after L0 search" << "\n";
+
   for (int i{1}; i < records.size(); i++) {
+    if (records[i].empty())
+      continue;
     std::shared_ptr<Sstable> res{search_level(key, records[i])};
-    if (res) {
+    std::cerr << "l1 1" << "\n";
+    std::cerr << "res get " << res.get() << "\n";
+    if (res.get()) {
+      std::cerr << "in case" << "\n";
       std::optional<Record> sstable_res{res.get()->read(key)};
+      std::cerr << "L1 2" << "\n";
       if (sstable_res.has_value()) {
+        std::cerr << "L1 3" << "\n";
         if (sstable_res.value().op == OperationRecord::DELETE) {
+          std::cerr << "L1 4" << "\n";
           return {};
         }
 
-        return sstable_res.value().value;
+        auto res = sstable_res.value().value;
+        std::cerr << "L1 5" << "\n";
+        return res;
       }
     }
   }
+
+  std::cerr << "after LN + 1 search" << "\n";
 
   return {};
 }
