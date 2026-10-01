@@ -1,13 +1,11 @@
 #include "LsmEngine.h"
 #include "engine_op.h"
 #include "memtable.h"
-#include "sstable.h"
 #include "sstable_writer.h"
 #include <cstddef>
 #include <filesystem>
 #include <gtest/gtest.h>
 #include <gtest/gtest_prod.h>
-#include <memory>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -19,7 +17,11 @@ class EngineTest : public ::testing::Test {
 protected:
   fs::path dir_path;
   fs::path sstable_dir;
-  fs::path sstable_file;
+  fs::path sstable0_file;
+  fs::path sstable1_file;
+  fs::path sstable2_file;
+  fs::path sstable3_file;
+
   void SetUp() override {
     dir_path =
         fs::temp_directory_path() /
@@ -32,7 +34,10 @@ protected:
         ("sstable_" + std::to_string(::getppid()) + "_" +
          ::testing::UnitTest::GetInstance()->current_test_info()->name());
     fs::create_directory(sstable_dir);
-    sstable_file = sstable_dir / "test.sst";
+    sstable0_file = sstable_dir / "test0.sst";
+    sstable1_file = sstable_dir / "test1.sst";
+    sstable2_file = sstable_dir / "test2.sst";
+    sstable3_file = sstable_dir / "test3.sst";
   }
   void TearDown() override {
     std::error_code ec;
@@ -181,7 +186,10 @@ TEST_F(EngineTest, LevelReadPath) {
   LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
 
   std::uint32_t seed{1042};
-  Memtable memtable{seed};
+  Memtable memtable0{seed};
+  Memtable memtable1{seed};
+  Memtable memtable2{seed};
+  Memtable memtable3{seed};
 
   std::vector<std::byte> key1{bytes("key1")};
   std::vector<std::byte> key2{bytes("key2")};
@@ -193,17 +201,71 @@ TEST_F(EngineTest, LevelReadPath) {
 
   std::string key1_L1{"apple"};
   std::string key2_L1{"banana"};
+  std::string key3_L1{"cat"};
+
+  std::string key4_L1{"door"};
+  std::string key5_L1{"ether"};
+  std::string key6_L1{"flag"};
+
+  std::string key7_L1{"great"};
+  std::string key8_L1{"holy"};
+  std::string key9_L1{"imm"};
+
+  std::string key10_L1{"joke"};
+  std::string key11_L1{"kino"};
+  std::string key12_L1{"like"};
 
   auto bytes_key1{bytes(key1_L1)};
   auto bytes_key2{bytes(key2_L1)};
+  auto bytes_key3{bytes(key3_L1)};
 
-  memtable.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
-  memtable.insert(bytes_key2, bytes_key2, OperationRecord::PUT, false);
+  auto bytes_key4{bytes(key4_L1)};
+  auto bytes_key5{bytes(key5_L1)};
+  auto bytes_key6{bytes(key6_L1)};
 
-  SstableWriter sstable_writer{SstableWriter(sstable_file)};
-  sstable_writer.flush_memtable(memtable);
-  auto sstable{std::make_shared<Sstable>(sstable_file)};
-  sstable->set_min_max(sstable_writer.min_key, sstable_writer.max_key);
+  auto bytes_key7{bytes(key7_L1)};
+  auto bytes_key8{bytes(key8_L1)};
+  auto bytes_key9{bytes(key9_L1)};
+
+  auto bytes_key10{bytes(key10_L1)};
+  auto bytes_key11{bytes(key11_L1)};
+  auto bytes_key12{bytes(key12_L1)};
+
+  memtable0.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
+  memtable0.insert(bytes_key2, bytes_key2, OperationRecord::PUT, false);
+  memtable0.insert(bytes_key3, bytes_key2, OperationRecord::PUT, false);
+
+  memtable1.insert(bytes_key4, bytes_key4, OperationRecord::PUT, false);
+  memtable1.insert(bytes_key5, bytes_key5, OperationRecord::PUT, false);
+  memtable1.insert(bytes_key6, bytes_key6, OperationRecord::PUT, false);
+
+  memtable2.insert(bytes_key7, bytes_key7, OperationRecord::PUT, false);
+  memtable2.insert(bytes_key8, bytes_key8, OperationRecord::PUT, false);
+  memtable2.insert(bytes_key9, bytes_key9, OperationRecord::PUT, false);
+
+  memtable3.insert(bytes_key10, bytes_key10, OperationRecord::PUT, false);
+  memtable3.insert(bytes_key11, bytes_key11, OperationRecord::PUT, false);
+  memtable3.insert(bytes_key12, bytes_key12, OperationRecord::PUT, false);
+
+  SstableWriter sstable_writer0{SstableWriter(sstable0_file)};
+  sstable_writer0.flush_memtable(memtable0);
+  auto sstable0{std::make_shared<Sstable>(sstable0_file)};
+  sstable0->set_min_max(sstable_writer0.min_key, sstable_writer0.max_key);
+
+  SstableWriter sstable_writer1{SstableWriter(sstable1_file)};
+  sstable_writer1.flush_memtable(memtable1);
+  auto sstable1{std::make_shared<Sstable>(sstable1_file)};
+  sstable1->set_min_max(sstable_writer1.min_key, sstable_writer1.max_key);
+
+  SstableWriter sstable_writer2{SstableWriter(sstable2_file)};
+  sstable_writer2.flush_memtable(memtable2);
+  auto sstable2{std::make_shared<Sstable>(sstable2_file)};
+  sstable2->set_min_max(sstable_writer2.min_key, sstable_writer2.max_key);
+
+  SstableWriter sstable_writer3{SstableWriter(sstable3_file)};
+  sstable_writer3.flush_memtable(memtable3);
+  auto sstable3{std::make_shared<Sstable>(sstable3_file)};
+  sstable3->set_min_max(sstable_writer3.min_key, sstable_writer3.max_key);
 
   // Act
   engine.put(key1, key1);
@@ -214,14 +276,17 @@ TEST_F(EngineTest, LevelReadPath) {
   engine.put(key6, key6);
   engine.put(key7, key7);
 
-  engine.add_to_level(1, std::move(sstable));
+  engine.add_to_level(1, std::move(sstable0));
+  engine.add_to_level(1, std::move(sstable1));
+  engine.add_to_level(1, std::move(sstable2));
+  engine.add_to_level(1, std::move(sstable3));
 
   // Assert
   std::optional<std::vector<std::byte>> res1{engine.get(key1)};
-  std::optional<std::vector<std::byte>> res2{engine.get(bytes_key1)};
+  std::optional<std::vector<std::byte>> res2{engine.get(bytes_key10)};
 
   EXPECT_TRUE(res1.has_value());
   EXPECT_TRUE(res2.has_value());
   EXPECT_EQ(res1.value(), key1);
-  EXPECT_EQ(res2.value(), bytes_key1);
+  EXPECT_EQ(res2.value(), bytes_key10);
 }

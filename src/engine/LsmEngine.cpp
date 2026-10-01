@@ -108,8 +108,6 @@ LsmEngine::get(std::vector<std::byte> key) {
     return memtabel_res.value().value;
   }
 
-  std::cerr << "after mem search" << "\n";
-
   for (auto it{records[0].rbegin()}; it != records[0].rend(); it++) {
     std::optional<Record> sstable_res{it->get()->read(key)};
     if (sstable_res.has_value()) {
@@ -120,33 +118,21 @@ LsmEngine::get(std::vector<std::byte> key) {
     }
   }
 
-  std::cerr << "after L0 search" << "\n";
-
   for (int i{1}; i < records.size(); i++) {
     if (records[i].empty())
       continue;
     std::shared_ptr<Sstable> res{search_level(key, records[i])};
-    std::cerr << "l1 1" << "\n";
-    std::cerr << "res get " << res.get() << "\n";
-    if (res.get()) {
-      std::cerr << "in case" << "\n";
+    if (res) {
       std::optional<Record> sstable_res{res.get()->read(key)};
-      std::cerr << "L1 2" << "\n";
       if (sstable_res.has_value()) {
-        std::cerr << "L1 3" << "\n";
         if (sstable_res.value().op == OperationRecord::DELETE) {
-          std::cerr << "L1 4" << "\n";
           return {};
         }
 
-        auto res = sstable_res.value().value;
-        std::cerr << "L1 5" << "\n";
-        return res;
+        return sstable_res.value().value;
       }
     }
   }
-
-  std::cerr << "after LN + 1 search" << "\n";
 
   return {};
 }
@@ -157,7 +143,6 @@ void LsmEngine::put(std::vector<std::byte> key, std::vector<std::byte> value) {
   std::optional<Record> res{memtable.search(key)};
 
   if (surpass_threshold()) {
-    std::cerr << "flush l0" << "\n";
     flush_state();
   }
 }
@@ -168,7 +153,6 @@ void LsmEngine::delete_record(std::vector<std::byte> key) {
   memtable.delete_node(key);
 
   if (surpass_threshold()) {
-    std::cerr << "threshold 2" << "\n";
     flush_state();
   }
 }
@@ -262,10 +246,25 @@ LsmEngine::search_level(const std::vector<std::byte> &key,
   std::size_t low{0};
   std::size_t high{level.size() - 1};
 
-  while (low < high) {
+  while (low <= high) {
     std::size_t mid = low + (high - low) / 2;
+
     int low_comparison{compare_bytes(level[mid].get()->min_key, key)};
     int high_comparison{compare_bytes(level[mid].get()->max_key, key)};
+
+    std::cerr << "low " << low << "mid " << mid << "high " << high
+              << "low comparison " << low_comparison << "high_comparison "
+              << high_comparison << "\n";
+
+    if (low == high) {
+      if ((low_comparison > 0 && high_comparison < 0) || low_comparison == 0 ||
+          high_comparison == 0) {
+        return level[low];
+      } else {
+        return nullptr;
+      }
+    }
+
     if (low_comparison < 0 && high_comparison < 0) {
       low = mid + 1;
     } else if (low_comparison > 0 && high_comparison > 0) {
