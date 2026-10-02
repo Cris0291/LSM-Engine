@@ -56,14 +56,14 @@ public:
     std::size_t block_size{};
     std::vector<Record> records_buffer{};
     std::size_t buffer_pos{};
-    Iterator(std::shared_ptr<Sstable> _parent, int n, std::size_t size);
-    Iterator(const Iterator &other);
     bool trigger_fill();
     void fill_buffer(std::shared_ptr<Sstable> parent);
 
     friend class Sstable;
 
   public:
+    Iterator(std::shared_ptr<Sstable> _parent, int n, std::size_t size);
+    Iterator(const Iterator &other);
     Iterator &operator++();
     Iterator operator++(int);
     Record operator*();
