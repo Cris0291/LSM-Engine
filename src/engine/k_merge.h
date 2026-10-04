@@ -21,9 +21,8 @@ private:
       return res > 0;
     }
   };
-  std::vector<Sstable::Iterator> iteratos;
-  std::priority_queue<DataEntry, std::vector<DataEntry>, Comparator> min_heap;
-  Sstable::Iterator end;
+  std::vector<Sstable::Iterator> iteratos{};
+  std::priority_queue<DataEntry, std::vector<DataEntry>, Comparator> min_heap{};
 
 public:
   void flush();

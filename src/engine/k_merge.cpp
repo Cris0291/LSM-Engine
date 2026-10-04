@@ -1,5 +1,6 @@
 #include "k_merge.h"
 #include "operation.h"
+#include "sstable.h"
 
 void KMerge::seed_k(std::span<std::shared_ptr<Sstable>> tables) {
   for (auto table : tables) {
@@ -25,7 +26,7 @@ std::vector<Record> KMerge::merge_k(bool is_last_level) {
         break;
       auto &it{iteratos[next_entry.rank]};
       min_heap.pop();
-      if (it != end) {
+      if (it.valid()) {
         ++it;
         DataEntry new_entry{(*it).key, next_entry.rank};
         min_heap.push(std::move(new_entry));
@@ -36,7 +37,7 @@ std::vector<Record> KMerge::merge_k(bool is_last_level) {
     if (!is_last_level || (*curr_it).op != OperationRecord::DELETE) {
       res.push_back({(*curr_it).key, (*curr_it).value, (*curr_it).op});
     }
-    if (curr_it != end) {
+    if (curr_it.valid()) {
       ++curr_it;
       DataEntry new_entry{(*curr_it).key, curr_entry.rank};
       min_heap.push(std::move(new_entry));

@@ -70,6 +70,7 @@ public:
     Record &operator*();
     bool operator==(const Iterator &other) const;
     bool operator!=(const Iterator &other) const;
+    bool valid();
   };
   Iterator begin();
   Iterator end();

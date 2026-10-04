@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine_op.h"
+#include "k_merge.h"
 #include "memtable.h"
 #include "sstable.h"
 #include "wal.h"
@@ -28,6 +29,7 @@ private:
   std::vector<std::vector<std::shared_ptr<Sstable>>> records;
   Memtable memtable;
   Wal wal;
+  KMerge k_merge{};
   std::size_t bytes_convertion(std::size_t bytes);
   std::string create_path();
   std::uint32_t generate_seed();
@@ -42,7 +44,10 @@ private:
   void add_to_level(std::size_t level, const std::shared_ptr<Sstable> &&table);
   void remove_from_level(std::size_t level, std::size_t index);
   void sort_level(std::vector<std::shared_ptr<Sstable>> &level);
+  std::vector<Record> merge_tables(std::span<std::shared_ptr<Sstable>> tables,
+                                   bool is_last_level);
   friend class EngineTest_LevelReadPath_Test;
+  friend class EngineTest_KWayMerge_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);

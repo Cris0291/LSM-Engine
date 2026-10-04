@@ -408,3 +408,7 @@ void Sstable::set_min_max(std::vector<std::byte> _min_key,
   min_key = _min_key;
   max_key = _max_key;
 }
+
+bool Sstable::Iterator::valid() {
+  return curr_block < parent.get()->index_entries.size();
+}

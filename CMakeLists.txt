@@ -29,7 +29,10 @@ target_link_libraries(sstable_lib PUBLIC memtable_lib)
 target_link_libraries(sstable_lib PUBLIC ZLIB::ZLIB)
 target_link_libraries(sstable_lib PUBLIC utility)
 
-add_library(engine_lib src/engine/LsmEngine.cpp)
+add_library(engine_lib 
+  src/engine/LsmEngine.cpp
+  src/engine/k_merge.cpp
+)
 target_include_directories(engine_lib PUBLIC src/engine)
 target_link_libraries(engine_lib PUBLIC memtable_lib)
 target_link_libraries(engine_lib PUBLIC wal_lib)

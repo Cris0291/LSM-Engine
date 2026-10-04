@@ -1,6 +1,8 @@
 #include "LsmEngine.h"
 #include "engine_op.h"
+#include "lsm_utilities.h"
 #include "memtable.h"
+#include "operation.h"
 #include "sstable_writer.h"
 #include <cstddef>
 #include <filesystem>
@@ -60,8 +62,6 @@ static std::vector<std::byte> bytes(const std::string s) {
 
 static void insert_engine_table(LsmEngine &engine, int i) {
   std::size_t max_keys{10000};
-  std::uint32_t seed{1000};
-  Memtable memtable{seed};
 
   for (; i < max_keys; i++) {
     std::vector<std::byte> key{bytes(std::format("key_{:06d}", i))};
@@ -309,8 +309,20 @@ TEST_F(EngineTest, KWayMerge) {
   MemoryUnit unit{MemoryUnit::B};
   LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
 
-  std::size_t max_keys{10000};
+  int i{9000};
 
-  for (int i{9000}; i <= max_keys; i -= 1000) {
+  while (i >= 0) {
+    insert_engine_table(engine, i);
+    i -= 1000;
+  }
+
+  // Act
+  std::vector<Record> res{engine.merge_tables(engine.records[0], false)};
+
+  // Assert
+  for (int i{1}; i < res.size(); ++i) {
+    int prev{i - 1};
+    int comp_res{compare_bytes(res[prev].key, res[i].key)};
+    EXPECT_LT(comp_res, 0);
   }
 }

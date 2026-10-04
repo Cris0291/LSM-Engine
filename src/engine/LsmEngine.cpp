@@ -292,3 +292,12 @@ void LsmEngine::sort_level(std::vector<std::shared_ptr<Sstable>> &level) {
         return max_to_min < 0;
       });
 }
+
+std::vector<Record>
+LsmEngine::merge_tables(std::span<std::shared_ptr<Sstable>> tables,
+                        bool is_last_level) {
+  k_merge.seed_k(tables);
+  std::vector<Record> records{k_merge.merge_k(is_last_level)};
+  k_merge.flush();
+  return records;
+}
