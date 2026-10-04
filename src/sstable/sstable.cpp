@@ -367,7 +367,7 @@ Sstable::Iterator Sstable::Iterator::operator++(int) {
   return it;
 }
 
-Record Sstable::Iterator::operator*() { return records_buffer[buffer_pos]; }
+Record &Sstable::Iterator::operator*() { return records_buffer[buffer_pos]; }
 
 bool Sstable::Iterator::operator==(const Iterator &other) const {
   return (parent == other.parent && curr_block == other.curr_block &&

@@ -4,6 +4,7 @@
 #include "sstable_writer.h"
 #include <cstddef>
 #include <filesystem>
+#include <format>
 #include <gtest/gtest.h>
 #include <gtest/gtest_prod.h>
 #include <optional>
@@ -55,6 +56,17 @@ static std::vector<std::byte> bytes(const std::string s) {
   }
 
   return bytes;
+};
+
+static void insert_engine_table(LsmEngine &engine, int i) {
+  std::size_t max_keys{10000};
+  std::uint32_t seed{1000};
+  Memtable memtable{seed};
+
+  for (; i < max_keys; i++) {
+    std::vector<std::byte> key{bytes(std::format("key_{:06d}", i))};
+    engine.put(key, key);
+  }
 };
 
 TEST_F(EngineTest, PutGetOperation) {
@@ -289,4 +301,16 @@ TEST_F(EngineTest, LevelReadPath) {
   EXPECT_TRUE(res2.has_value());
   EXPECT_EQ(res1.value(), key1);
   EXPECT_EQ(res2.value(), bytes_key10);
+}
+
+TEST_F(EngineTest, KWayMerge) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
+
+  std::size_t max_keys{10000};
+
+  for (int i{9000}; i <= max_keys; i -= 1000) {
+  }
 }

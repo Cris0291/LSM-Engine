@@ -64,9 +64,10 @@ public:
   public:
     Iterator(std::shared_ptr<Sstable> _parent, int n, std::size_t size);
     Iterator(const Iterator &other);
+    Iterator(Iterator &&other) noexcept = default;
     Iterator &operator++();
     Iterator operator++(int);
-    Record operator*();
+    Record &operator*();
     bool operator==(const Iterator &other) const;
     bool operator!=(const Iterator &other) const;
   };
