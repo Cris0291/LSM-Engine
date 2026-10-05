@@ -18,7 +18,7 @@ private:
   struct Comparator {
     bool operator()(const DataEntry &a, const DataEntry &b) {
       int res{compare_bytes(a.key, b.key)};
-      return res > 0;
+      return res == 0 ? a.rank > b.rank : res > 0;
     }
   };
   std::vector<Sstable::Iterator> iteratos{};

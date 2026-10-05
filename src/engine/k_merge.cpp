@@ -20,14 +20,16 @@ std::vector<Record> KMerge::merge_k(bool is_last_level) {
     min_heap.pop();
 
     while (true) {
+      if (min_heap.empty())
+        break;
       const DataEntry &next_entry{min_heap.top()};
       int equal_res{compare_bytes(curr_entry.key, next_entry.key)};
       if (equal_res != 0)
         break;
       auto &it{iteratos[next_entry.rank]};
+      ++it;
       min_heap.pop();
       if (it.valid()) {
-        ++it;
         DataEntry new_entry{(*it).key, next_entry.rank};
         min_heap.push(std::move(new_entry));
       }
@@ -37,8 +39,9 @@ std::vector<Record> KMerge::merge_k(bool is_last_level) {
     if (!is_last_level || (*curr_it).op != OperationRecord::DELETE) {
       res.push_back({(*curr_it).key, (*curr_it).value, (*curr_it).op});
     }
+
+    ++curr_it;
     if (curr_it.valid()) {
-      ++curr_it;
       DataEntry new_entry{(*curr_it).key, curr_entry.rank};
       min_heap.push(std::move(new_entry));
     }

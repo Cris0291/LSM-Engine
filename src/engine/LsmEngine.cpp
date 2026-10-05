@@ -143,6 +143,7 @@ void LsmEngine::put(std::vector<std::byte> key, std::vector<std::byte> value) {
   std::optional<Record> res{memtable.search(key)};
 
   if (surpass_threshold()) {
+    std::cerr << "flush" << "\n";
     flush_state();
   }
 }

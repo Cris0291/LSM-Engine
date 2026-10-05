@@ -309,20 +309,58 @@ TEST_F(EngineTest, KWayMerge) {
   MemoryUnit unit{MemoryUnit::B};
   LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
 
-  int i{9000};
-
-  while (i >= 0) {
-    insert_engine_table(engine, i);
-    i -= 1000;
-  }
+  std::vector<std::byte> key1{bytes("key1")};
+  std::vector<std::byte> key2{bytes("key2")};
+  std::vector<std::byte> key3{bytes("key3")};
+  std::vector<std::byte> key4{bytes("key4")};
+  std::vector<std::byte> key5{bytes("key5")};
+  std::vector<std::byte> key6{bytes("key7")};
+  std::vector<std::byte> key7{bytes("key7")};
+  std::vector<std::byte> key8{bytes("key7")};
+  std::vector<std::byte> key9{bytes("key8")};
+  std::vector<std::byte> key10{bytes("key9")};
+  std::vector<std::byte> key11{bytes("key10")};
+  std::vector<std::byte> key12{bytes("key11")};
+  std::vector<std::byte> key13{bytes("key11")};
+  std::vector<std::byte> key14{bytes("key11")};
+  std::vector<std::byte> key15{bytes("key11")};
+  std::vector<std::byte> key16{bytes("key12")};
+  std::vector<std::byte> key17{bytes("key12")};
+  std::vector<std::byte> key18{bytes("key12")};
+  std::vector<std::byte> key19{bytes("key13")};
+  std::vector<std::byte> key20{bytes("key13")};
+  std::vector<std::byte> key21{bytes("key13")};
+  std::vector<std::byte> key22{bytes("key13")};
 
   // Act
-  std::vector<Record> res{engine.merge_tables(engine.records[0], false)};
+  engine.put(key1, key1);
+  engine.put(key2, key2);
+  engine.put(key3, key3);
+  engine.put(key4, key4);
+  engine.put(key5, key5);
+  engine.put(key6, key6);
+  engine.put(key7, key7);
+  engine.put(key8, key8);
+  engine.put(key9, key9);
+  engine.put(key10, key10);
+  engine.put(key11, key11);
+  engine.put(key12, key12);
+  engine.put(key13, key13);
+  engine.put(key14, key14);
+  engine.put(key15, key15);
+  engine.put(key16, key16);
+  engine.put(key17, key17);
+  engine.put(key18, key18);
+  engine.put(key19, key19);
+  engine.put(key20, key20);
+  engine.put(key21, key21);
+  engine.put(key22, key22);
 
   // Assert
+  std::vector<Record> res{engine.merge_tables(engine.records[0], false)};
   for (int i{1}; i < res.size(); ++i) {
     int prev{i - 1};
-    int comp_res{compare_bytes(res[prev].key, res[i].key)};
-    EXPECT_LT(comp_res, 0);
+    int compare_res{compare_bytes(res[prev].key, res[i].key)};
+    EXPECT_LT(compare_res, 0);
   }
 }
