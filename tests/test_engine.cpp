@@ -3,12 +3,14 @@
 #include "lsm_utilities.h"
 #include "memtable.h"
 #include "operation.h"
+#include "sstable.h"
 #include "sstable_writer.h"
 #include <cstddef>
 #include <filesystem>
 #include <format>
 #include <gtest/gtest.h>
 #include <gtest/gtest_prod.h>
+#include <memory>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -60,14 +62,14 @@ static std::vector<std::byte> bytes(const std::string s) {
   return bytes;
 };
 
-static void insert_engine_table(LsmEngine &engine, int i) {
-  std::size_t max_keys{10000};
-
-  for (; i < max_keys; i++) {
-    std::vector<std::byte> key{bytes(std::format("key_{:06d}", i))};
-    engine.put(key, key);
+static std::string from_bytes_to_string(std::vector<std::byte> bytes) {
+  std::string s;
+  for (std::byte b : bytes) {
+    s.push_back(static_cast<char>(b));
   }
-};
+
+  return s;
+}
 
 TEST_F(EngineTest, PutGetOperation) {
   // Arrange
@@ -309,7 +311,16 @@ TEST_F(EngineTest, KWayMerge) {
   MemoryUnit unit{MemoryUnit::B};
   LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
 
+  std::string test_key{"T"};
+  std::string new_test_val{"new_v"};
+  std::string old_test_v{"old_v"};
+
+  std::string deleted_key{"deleted"};
+
   std::vector<std::byte> key1{bytes("key1")};
+  std::vector<std::byte> keyRecency{bytes(test_key)};
+  std::vector<std::byte> valNew{bytes(new_test_val)};
+  std::vector<std::byte> valOld{bytes(old_test_v)};
   std::vector<std::byte> key2{bytes("key2")};
   std::vector<std::byte> key3{bytes("key3")};
   std::vector<std::byte> key4{bytes("key4")};
@@ -331,8 +342,11 @@ TEST_F(EngineTest, KWayMerge) {
   std::vector<std::byte> key20{bytes("key13")};
   std::vector<std::byte> key21{bytes("key13")};
   std::vector<std::byte> key22{bytes("key13")};
+  std::vector<std::byte> del_key{bytes(deleted_key)};
 
   // Act
+  engine.put(keyRecency, valOld);
+  engine.put(del_key, del_key);
   engine.put(key1, key1);
   engine.put(key2, key2);
   engine.put(key3, key3);
@@ -346,6 +360,8 @@ TEST_F(EngineTest, KWayMerge) {
   engine.put(key11, key11);
   engine.put(key12, key12);
   engine.put(key13, key13);
+  engine.put(keyRecency, valNew);
+  engine.delete_record(del_key);
   engine.put(key14, key14);
   engine.put(key15, key15);
   engine.put(key16, key16);
@@ -357,10 +373,26 @@ TEST_F(EngineTest, KWayMerge) {
   engine.put(key22, key22);
 
   // Assert
-  std::vector<Record> res{engine.merge_tables(engine.records[0], false)};
+  std::vector<std::shared_ptr<Sstable>> new_to_old(engine.records[0].rbegin(),
+                                                   engine.records[0].rend());
+  std::vector<Record> res{engine.merge_tables(new_to_old, true)};
   for (int i{1}; i < res.size(); ++i) {
     int prev{i - 1};
     int compare_res{compare_bytes(res[prev].key, res[i].key)};
     EXPECT_LT(compare_res, 0);
   }
+
+  std::string v{"non val"};
+  std::string del{"non del test"};
+  for (int i{}; i < res.size(); ++i) {
+    std::string k{from_bytes_to_string(res[i].key)};
+    if (k == test_key) {
+      v = from_bytes_to_string(res[i].value);
+    } else if (k == deleted_key) {
+      del = k;
+    }
+  }
+
+  EXPECT_EQ(v, new_test_val);
+  EXPECT_NE(del, deleted_key);
 }
