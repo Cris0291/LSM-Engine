@@ -305,94 +305,83 @@ TEST_F(EngineTest, LevelReadPath) {
   EXPECT_EQ(res2.value(), bytes_key10);
 }
 
-TEST_F(EngineTest, KWayMerge) {
+TEST_F(EngineTest, MergeNewestWinsWithManyTables) {
   // Arrange
   std::size_t threshold{650};
   MemoryUnit unit{MemoryUnit::B};
   LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
 
-  std::string test_key{"T"};
-  std::string new_test_val{"new_v"};
-  std::string old_test_v{"old_v"};
+  std::uint32_t seed{1042};
+  Memtable memtable0{seed};
+  Memtable memtable1{seed};
+  Memtable memtable2{seed};
+  Memtable memtable3{seed};
 
-  std::string deleted_key{"deleted"};
+  std::string key1_L1{"apple"};
+  std::string key2_L1{"banana"};
+  std::string key3_L1{"cat"};
 
-  std::vector<std::byte> key1{bytes("key1")};
-  std::vector<std::byte> keyRecency{bytes(test_key)};
-  std::vector<std::byte> valNew{bytes(new_test_val)};
-  std::vector<std::byte> valOld{bytes(old_test_v)};
-  std::vector<std::byte> key2{bytes("key2")};
-  std::vector<std::byte> key3{bytes("key3")};
-  std::vector<std::byte> key4{bytes("key4")};
-  std::vector<std::byte> key5{bytes("key5")};
-  std::vector<std::byte> key6{bytes("key7")};
-  std::vector<std::byte> key7{bytes("key7")};
-  std::vector<std::byte> key8{bytes("key7")};
-  std::vector<std::byte> key9{bytes("key8")};
-  std::vector<std::byte> key10{bytes("key9")};
-  std::vector<std::byte> key11{bytes("key10")};
-  std::vector<std::byte> key12{bytes("key11")};
-  std::vector<std::byte> key13{bytes("key11")};
-  std::vector<std::byte> key14{bytes("key11")};
-  std::vector<std::byte> key15{bytes("key11")};
-  std::vector<std::byte> key16{bytes("key12")};
-  std::vector<std::byte> key17{bytes("key12")};
-  std::vector<std::byte> key18{bytes("key12")};
-  std::vector<std::byte> key19{bytes("key13")};
-  std::vector<std::byte> key20{bytes("key13")};
-  std::vector<std::byte> key21{bytes("key13")};
-  std::vector<std::byte> key22{bytes("key13")};
-  std::vector<std::byte> del_key{bytes(deleted_key)};
+  std::string key4_L1{"door"};
+  std::string key5_L1{"ether"};
+  std::string key6_L1{"flag"};
 
-  // Act
-  engine.put(keyRecency, valOld);
-  engine.put(del_key, del_key);
-  engine.put(key1, key1);
-  engine.put(key2, key2);
-  engine.put(key3, key3);
-  engine.put(key4, key4);
-  engine.put(key5, key5);
-  engine.put(key6, key6);
-  engine.put(key7, key7);
-  engine.put(key8, key8);
-  engine.put(key9, key9);
-  engine.put(key10, key10);
-  engine.put(key11, key11);
-  engine.put(key12, key12);
-  engine.put(key13, key13);
-  engine.put(keyRecency, valNew);
-  engine.delete_record(del_key);
-  engine.put(key14, key14);
-  engine.put(key15, key15);
-  engine.put(key16, key16);
-  engine.put(key17, key17);
-  engine.put(key18, key18);
-  engine.put(key19, key19);
-  engine.put(key20, key20);
-  engine.put(key21, key21);
-  engine.put(key22, key22);
+  std::string key7_L1{"great"};
+  std::string key8_L1{"holy"};
+  std::string key9_L1{"imm"};
 
-  // Assert
-  std::vector<std::shared_ptr<Sstable>> new_to_old(engine.records[0].rbegin(),
-                                                   engine.records[0].rend());
-  std::vector<Record> res{engine.merge_tables(new_to_old, true)};
-  for (int i{1}; i < res.size(); ++i) {
-    int prev{i - 1};
-    int compare_res{compare_bytes(res[prev].key, res[i].key)};
-    EXPECT_LT(compare_res, 0);
-  }
+  std::string key10_L1{"joke"};
+  std::string key11_L1{"kino"};
+  std::string key12_L1{"like"};
 
-  std::string v{"non val"};
-  std::string del{"non del test"};
-  for (int i{}; i < res.size(); ++i) {
-    std::string k{from_bytes_to_string(res[i].key)};
-    if (k == test_key) {
-      v = from_bytes_to_string(res[i].value);
-    } else if (k == deleted_key) {
-      del = k;
-    }
-  }
+  auto bytes_key1{bytes(key1_L1)};
+  auto bytes_key2{bytes(key2_L1)};
+  auto bytes_key3{bytes(key3_L1)};
 
-  EXPECT_EQ(v, new_test_val);
-  EXPECT_NE(del, deleted_key);
+  auto bytes_key4{bytes(key4_L1)};
+  auto bytes_key5{bytes(key5_L1)};
+  auto bytes_key6{bytes(key6_L1)};
+
+  auto bytes_key7{bytes(key7_L1)};
+  auto bytes_key8{bytes(key8_L1)};
+  auto bytes_key9{bytes(key9_L1)};
+
+  auto bytes_key10{bytes(key10_L1)};
+  auto bytes_key11{bytes(key11_L1)};
+  auto bytes_key12{bytes(key12_L1)};
+
+  memtable0.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
+  memtable0.insert(bytes_key2, bytes_key2, OperationRecord::PUT, false);
+  memtable0.insert(bytes_key3, bytes_key2, OperationRecord::PUT, false);
+
+  memtable1.insert(bytes_key4, bytes_key4, OperationRecord::PUT, false);
+  memtable1.insert(bytes_key5, bytes_key5, OperationRecord::PUT, false);
+  memtable1.insert(bytes_key6, bytes_key6, OperationRecord::PUT, false);
+
+  memtable2.insert(bytes_key7, bytes_key7, OperationRecord::PUT, false);
+  memtable2.insert(bytes_key8, bytes_key8, OperationRecord::PUT, false);
+  memtable2.insert(bytes_key9, bytes_key9, OperationRecord::PUT, false);
+
+  memtable3.insert(bytes_key10, bytes_key10, OperationRecord::PUT, false);
+  memtable3.insert(bytes_key11, bytes_key11, OperationRecord::PUT, false);
+  memtable3.insert(bytes_key12, bytes_key12, OperationRecord::PUT, false);
+
+  SstableWriter sstable_writer0{SstableWriter(sstable0_file)};
+  sstable_writer0.flush_memtable(memtable0);
+  auto sstable0{std::make_shared<Sstable>(sstable0_file)};
+  sstable0->set_min_max(sstable_writer0.min_key, sstable_writer0.max_key);
+
+  SstableWriter sstable_writer1{SstableWriter(sstable1_file)};
+  sstable_writer1.flush_memtable(memtable1);
+  auto sstable1{std::make_shared<Sstable>(sstable1_file)};
+  sstable1->set_min_max(sstable_writer1.min_key, sstable_writer1.max_key);
+
+  SstableWriter sstable_writer2{SstableWriter(sstable2_file)};
+  sstable_writer2.flush_memtable(memtable2);
+  auto sstable2{std::make_shared<Sstable>(sstable2_file)};
+  sstable2->set_min_max(sstable_writer2.min_key, sstable_writer2.max_key);
+
+  SstableWriter sstable_writer3{SstableWriter(sstable3_file)};
+  sstable_writer3.flush_memtable(memtable3);
+  auto sstable3{std::make_shared<Sstable>(sstable3_file)};
+  sstable3->set_min_max(sstable_writer3.min_key, sstable_writer3.max_key);
 }
