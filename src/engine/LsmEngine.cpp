@@ -280,7 +280,7 @@ LsmEngine::search_level(const std::vector<std::byte> &key,
 void LsmEngine::add_to_level(std::size_t level,
                              const std::shared_ptr<Sstable> &&table) {
   records[level].push_back(std::move(table));
-  if (records[level].size() > 1) {
+  if (records[level].size() > 1 && level != 0) {
     sort_level(records[level]);
   }
 }

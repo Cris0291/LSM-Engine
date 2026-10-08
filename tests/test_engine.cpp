@@ -14,6 +14,7 @@
 #include <optional>
 #include <string>
 #include <system_error>
+#include <tuple>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -69,6 +70,26 @@ static std::string from_bytes_to_string(std::vector<std::byte> bytes) {
   }
 
   return s;
+}
+
+static std::shared_ptr<Sstable>
+create_table(const fs::path &file,
+             std::vector<std::tuple<std::string, std::string, OperationRecord>>
+                 &entries) {
+  std::uint32_t seed{1042};
+  Memtable memtable{seed};
+
+  for (auto &[k, v, op] : entries) {
+    memtable.insert(bytes(k), bytes(v), op, false);
+  }
+
+  SstableWriter sswriter{SstableWriter(file)};
+  sswriter.flush_memtable(memtable);
+  auto sstable{std::make_shared<Sstable>(file)};
+  sstable->min_key = sswriter.min_key;
+  sstable->max_key = sswriter.max_key;
+
+  return sstable;
 }
 
 TEST_F(EngineTest, PutGetOperation) {
@@ -311,12 +332,6 @@ TEST_F(EngineTest, MergeNewestWinsWithManyTables) {
   MemoryUnit unit{MemoryUnit::B};
   LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
 
-  std::uint32_t seed{1042};
-  Memtable memtable0{seed};
-  Memtable memtable1{seed};
-  Memtable memtable2{seed};
-  Memtable memtable3{seed};
-
   std::string key1_L1{"apple"};
   std::string key2_L1{"banana"};
   std::string key3_L1{"cat"};
@@ -333,55 +348,74 @@ TEST_F(EngineTest, MergeNewestWinsWithManyTables) {
   std::string key11_L1{"kino"};
   std::string key12_L1{"like"};
 
-  auto bytes_key1{bytes(key1_L1)};
-  auto bytes_key2{bytes(key2_L1)};
-  auto bytes_key3{bytes(key3_L1)};
+  std::string key13_L1{"lion"};
+  std::string key14_L1{"machine"};
+  std::string key15_L1{"hike"};
 
-  auto bytes_key4{bytes(key4_L1)};
-  auto bytes_key5{bytes(key5_L1)};
-  auto bytes_key6{bytes(key6_L1)};
+  std::string key16_L1{"orns"};
+  std::string key17_L1{"pops"};
+  std::string key18_L1{"itchs"};
+  std::string key19_L1{"circle"};
+  std::string key20_L1{"lens"};
 
-  auto bytes_key7{bytes(key7_L1)};
-  auto bytes_key8{bytes(key8_L1)};
-  auto bytes_key9{bytes(key9_L1)};
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
 
-  auto bytes_key10{bytes(key10_L1)};
-  auto bytes_key11{bytes(key11_L1)};
-  auto bytes_key12{bytes(key12_L1)};
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
 
-  memtable0.insert(bytes_key1, bytes_key1, OperationRecord::PUT, false);
-  memtable0.insert(bytes_key2, bytes_key2, OperationRecord::PUT, false);
-  memtable0.insert(bytes_key3, bytes_key2, OperationRecord::PUT, false);
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
 
-  memtable1.insert(bytes_key4, bytes_key4, OperationRecord::PUT, false);
-  memtable1.insert(bytes_key5, bytes_key5, OperationRecord::PUT, false);
-  memtable1.insert(bytes_key6, bytes_key6, OperationRecord::PUT, false);
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key16_L1, key16_L1, OperationRecord::PUT},
+      {key17_L1, key17_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key18_L1, key18_L1, OperationRecord::PUT},
+      {key20_L1, key20_L1, OperationRecord::PUT}};
 
-  memtable2.insert(bytes_key7, bytes_key7, OperationRecord::PUT, false);
-  memtable2.insert(bytes_key8, bytes_key8, OperationRecord::PUT, false);
-  memtable2.insert(bytes_key9, bytes_key9, OperationRecord::PUT, false);
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
 
-  memtable3.insert(bytes_key10, bytes_key10, OperationRecord::PUT, false);
-  memtable3.insert(bytes_key11, bytes_key11, OperationRecord::PUT, false);
-  memtable3.insert(bytes_key12, bytes_key12, OperationRecord::PUT, false);
+  // Act
+  engine.add_to_level(0, std::move(sstable1));
+  engine.add_to_level(0, std::move(sstable2));
+  engine.add_to_level(0, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
 
-  SstableWriter sstable_writer0{SstableWriter(sstable0_file)};
-  sstable_writer0.flush_memtable(memtable0);
-  auto sstable0{std::make_shared<Sstable>(sstable0_file)};
-  sstable0->set_min_max(sstable_writer0.min_key, sstable_writer0.max_key);
+  std::vector<Record> records{engine.merge_tables(engine.records[0], false)};
 
-  SstableWriter sstable_writer1{SstableWriter(sstable1_file)};
-  sstable_writer1.flush_memtable(memtable1);
-  auto sstable1{std::make_shared<Sstable>(sstable1_file)};
-  sstable1->set_min_max(sstable_writer1.min_key, sstable_writer1.max_key);
+  // Assert
+  std::vector<std::byte> test_key{bytes(key7_L1)};
+  int key_count{};
+  for (auto &record : records) {
+    int res{compare_bytes(record.key, test_key)};
+    if (res == 0) {
+      key_count += 1;
+    }
+  }
 
-  SstableWriter sstable_writer2{SstableWriter(sstable2_file)};
-  sstable_writer2.flush_memtable(memtable2);
-  auto sstable2{std::make_shared<Sstable>(sstable2_file)};
-  sstable2->set_min_max(sstable_writer2.min_key, sstable_writer2.max_key);
+  EXPECT_EQ(key_count, 1);
+  std::cerr << "size: " << records.size() << "\n";
 
-  SstableWriter sstable_writer3{SstableWriter(sstable3_file)};
-  sstable_writer3.flush_memtable(memtable3);
-  auto sstable3{std::make_shared<Sstable>(sstable3_file)};
-  sstable3->set_min_max(sstable_writer3.min_key, sstable_writer3.max_key);
+  for (int i{1}; i < records.size(); ++i) {
+    int prev{i - 1};
+    int res{compare_bytes(records[prev].key, records[i].key)};
+    EXPECT_LT(res, 0);
+    std::cerr << i << "\n";
+  }
 }
