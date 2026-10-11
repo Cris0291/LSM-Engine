@@ -15,6 +15,15 @@ private:
     std::vector<std::byte> key;
     std::size_t rank;
   };
+  static std::string from_bytes_to_string(std::vector<std::byte> bytes) {
+    std::string s;
+    for (std::byte b : bytes) {
+      s.push_back(static_cast<char>(b));
+    }
+
+    return s;
+  }
+
   struct Comparator {
     bool operator()(const DataEntry &a, const DataEntry &b) {
       int res{compare_bytes(a.key, b.key)};

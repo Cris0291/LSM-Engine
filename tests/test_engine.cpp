@@ -326,6 +326,88 @@ TEST_F(EngineTest, LevelReadPath) {
   EXPECT_EQ(res2.value(), bytes_key10);
 }
 
+TEST_F(EngineTest, MergeWithManyTables) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
+
+  std::string key1_L1{"apple"};
+  std::string key2_L1{"banana"};
+  std::string key3_L1{"cat"};
+
+  std::string key4_L1{"door"};
+  std::string key5_L1{"ether"};
+  std::string key6_L1{"flag"};
+
+  std::string key7_L1{"great"};
+  std::string key8_L1{"holy"};
+  std::string key9_L1{"imm"};
+
+  std::string key10_L1{"joke"};
+  std::string key11_L1{"kino"};
+  std::string key12_L1{"like"};
+
+  std::string key13_L1{"lion"};
+  std::string key14_L1{"machine"};
+  std::string key15_L1{"hike"};
+
+  std::string key16_L1{"orns"};
+  std::string key17_L1{"pops"};
+  std::string key18_L1{"itchs"};
+  std::string key19_L1{"circle"};
+  std::string key20_L1{"lens"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key16_L1, key16_L1, OperationRecord::PUT},
+      {key17_L1, key17_L1, OperationRecord::PUT},
+      {key18_L1, key7_L1, OperationRecord::PUT},
+      {key19_L1, key18_L1, OperationRecord::PUT},
+      {key20_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(0, std::move(sstable1));
+  engine.add_to_level(0, std::move(sstable2));
+  engine.add_to_level(0, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  std::vector<Record> records{engine.merge_tables(engine.records[0], false)};
+
+  // Assert
+
+  for (int i{1}; i < records.size(); ++i) {
+    int prev{i - 1};
+    int res{compare_bytes(records[prev].key, records[i].key)};
+    EXPECT_LT(res, 0);
+  }
+}
+
 TEST_F(EngineTest, MergeNewestWinsWithManyTables) {
   // Arrange
   std::size_t threshold{650};
@@ -410,12 +492,192 @@ TEST_F(EngineTest, MergeNewestWinsWithManyTables) {
   }
 
   EXPECT_EQ(key_count, 1);
-  std::cerr << "size: " << records.size() << "\n";
 
   for (int i{1}; i < records.size(); ++i) {
     int prev{i - 1};
     int res{compare_bytes(records[prev].key, records[i].key)};
     EXPECT_LT(res, 0);
-    std::cerr << i << "\n";
   }
+}
+
+TEST_F(EngineTest, TombstoneLast) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
+
+  std::string key1_L1{"apple"};
+  std::string key2_L1{"banana"};
+  std::string key3_L1{"cat"};
+
+  std::string key4_L1{"door"};
+  std::string key5_L1{"ether"};
+  std::string key6_L1{"flag"};
+
+  std::string key7_L1{"great"};
+  std::string key8_L1{"holy"};
+  std::string key9_L1{"imm"};
+
+  std::string key10_L1{"joke"};
+  std::string key11_L1{"kino"};
+  std::string key12_L1{"like"};
+
+  std::string key13_L1{"lion"};
+  std::string key14_L1{"machine"};
+  std::string key15_L1{"hike"};
+
+  std::string key16_L1{"orns"};
+  std::string key17_L1{"pops"};
+  std::string key18_L1{"itchs"};
+  std::string key19_L1{"circle"};
+  std::string key20_L1{"lens"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::DELETE},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key16_L1, key16_L1, OperationRecord::PUT},
+      {key17_L1, key17_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key18_L1, key18_L1, OperationRecord::PUT},
+      {key20_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(0, std::move(sstable1));
+  engine.add_to_level(0, std::move(sstable2));
+  engine.add_to_level(0, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  std::vector<Record> records{engine.merge_tables(engine.records[0], true)};
+
+  // Assert
+  for (int i{1}; i < records.size(); ++i) {
+    int prev{i - 1};
+    int res{compare_bytes(records[prev].key, records[i].key)};
+    EXPECT_LT(res, 0);
+  }
+
+  bool is_deleted_key{false};
+  for (auto &record : records) {
+    std::string del_key{from_bytes_to_string(record.key)};
+    if (del_key == key7_L1) {
+      is_deleted_key = true;
+    }
+  }
+
+  EXPECT_FALSE(is_deleted_key);
+}
+
+TEST_F(EngineTest, TombstoneNotLast) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit)};
+
+  std::string key1_L1{"apple"};
+  std::string key2_L1{"banana"};
+  std::string key3_L1{"cat"};
+
+  std::string key4_L1{"door"};
+  std::string key5_L1{"ether"};
+  std::string key6_L1{"flag"};
+
+  std::string key7_L1{"great"};
+  std::string key8_L1{"holy"};
+  std::string key9_L1{"imm"};
+
+  std::string key10_L1{"joke"};
+  std::string key11_L1{"kino"};
+  std::string key12_L1{"like"};
+
+  std::string key13_L1{"lion"};
+  std::string key14_L1{"machine"};
+  std::string key15_L1{"hike"};
+
+  std::string key16_L1{"orns"};
+  std::string key17_L1{"pops"};
+  std::string key18_L1{"itchs"};
+  std::string key19_L1{"circle"};
+  std::string key20_L1{"lens"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::DELETE},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key16_L1, key16_L1, OperationRecord::PUT},
+      {key17_L1, key17_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key18_L1, key18_L1, OperationRecord::PUT},
+      {key20_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(0, std::move(sstable1));
+  engine.add_to_level(0, std::move(sstable2));
+  engine.add_to_level(0, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  std::vector<Record> records{engine.merge_tables(engine.records[0], false)};
+
+  // Assert
+  for (int i{1}; i < records.size(); ++i) {
+    int prev{i - 1};
+    int res{compare_bytes(records[prev].key, records[i].key)};
+    EXPECT_LT(res, 0);
+  }
+
+  bool is_deleted_key{false};
+  for (auto &record : records) {
+    std::string del_key{from_bytes_to_string(record.key)};
+    if (del_key == key7_L1) {
+      is_deleted_key = true;
+    }
+  }
+
+  EXPECT_TRUE(is_deleted_key);
 }

@@ -47,7 +47,10 @@ private:
   std::vector<Record> merge_tables(std::span<std::shared_ptr<Sstable>> tables,
                                    bool is_last_level);
   friend class EngineTest_LevelReadPath_Test;
+  friend class EngineTest_MergeWithManyTables_Test;
   friend class EngineTest_MergeNewestWinsWithManyTables_Test;
+  friend class EngineTest_TombstoneLast_Test;
+  friend class EngineTest_TombstoneNotLast_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);
