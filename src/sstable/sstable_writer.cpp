@@ -184,6 +184,12 @@ void SstableWriter::flush_memtable(Memtable &memtable) {
   create_sstable_writer(records);
 };
 
+void SstableWriter::flush_records(std::vector<Record> records) {
+  min_key = records[0].key;
+  max_key = records.back().key;
+  create_sstable_writer(records);
+}
+
 void SstableWriter::merge_sstables(
     std::initializer_list<std::reference_wrapper<Sstable>> reader_list) {
   std::vector<Record> records;

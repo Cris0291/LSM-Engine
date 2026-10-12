@@ -53,6 +53,7 @@ public:
   SstableWriter(std::string path);
   ~SstableWriter();
   void flush_memtable(Memtable &memtable);
+  void flush_records(std::vector<Record> records);
   void merge_sstables(
       std::initializer_list<std::reference_wrapper<Sstable>> reader_list);
 };

@@ -25,16 +25,21 @@ struct Record {
   OperationRecord op;
   std::vector<std::byte> key{};
   std::vector<std::byte> value{};
+  std::size_t size{};
 
   Record() : op(OperationRecord::NO_OP) {}
 
   Record(std::vector<std::byte> _key, std::vector<std::byte> _value,
          OperationRecord _op)
-      : key(_key), value(_value), op(_op) {}
+      : key(_key), value(_value), op(_op) {
+    size = sizeof(OperationRecord) + key.size() + value.size();
+  }
 
   Record(const DecodeResult &decode_result) : op(decode_result.op) {
     key.assign(decode_result.key.begin(), decode_result.key.end());
     value.assign(decode_result.value.begin(), decode_result.value.end());
+
+    size = sizeof(OperationRecord) + key.size() + value.size();
   }
 
   bool operator==(const Record &rhs) const = default;

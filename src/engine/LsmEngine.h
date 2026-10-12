@@ -3,6 +3,7 @@
 #include "engine_op.h"
 #include "k_merge.h"
 #include "memtable.h"
+#include "operation.h"
 #include "sstable.h"
 #include "wal.h"
 #include <cstddef>
@@ -10,6 +11,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <sys/types.h>
 #include <vector>
@@ -21,6 +23,7 @@ private:
   const std::string WAL_PATH{"wal.log"};
   const std::string SSTABLE_DIR{"sstable"};
   std::size_t size_threshold;
+  std::size_t table_target_size{};
   MemoryUnit memory_unit;
   int fd_flock;
   std::filesystem::path dir;
@@ -46,6 +49,9 @@ private:
   void sort_level(std::vector<std::shared_ptr<Sstable>> &level);
   std::vector<Record> merge_tables(std::span<std::shared_ptr<Sstable>> tables,
                                    bool is_last_level);
+  std::vector<std::shared_ptr<Sstable>>
+  split_merge(std::vector<Record> &records);
+  std::shared_ptr<Sstable> create_table(std::span<Record> recods);
   friend class EngineTest_LevelReadPath_Test;
   friend class EngineTest_MergeWithManyTables_Test;
   friend class EngineTest_MergeNewestWinsWithManyTables_Test;
@@ -53,7 +59,8 @@ private:
   friend class EngineTest_TombstoneNotLast_Test;
 
 public:
-  LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit);
+  LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit,
+            std::size_t _table_target_size = 2000);
   ~LsmEngine();
   std::optional<std::vector<std::byte>> get(std::vector<std::byte> key);
   void put(std::vector<std::byte> key, std::vector<std::byte> value);

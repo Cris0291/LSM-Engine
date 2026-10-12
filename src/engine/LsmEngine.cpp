@@ -15,15 +15,17 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <sys/file.h>
 #include <unistd.h>
 
 LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
-                     MemoryUnit unit)
+                     MemoryUnit unit, std::size_t _table_target_size)
     : dir(dir_path), memtable(generate_seed()), size_threshold(threshold),
-      memory_unit(unit), records(LEVELS) {
+      memory_unit(unit), records(LEVELS),
+      table_target_size(_table_target_size) {
   bool dir_exists{std::filesystem::exists(dir)};
   bool is_dir{std::filesystem::is_directory(dir)};
 
@@ -301,4 +303,50 @@ LsmEngine::merge_tables(std::span<std::shared_ptr<Sstable>> tables,
   std::vector<Record> records{k_merge.merge_k(is_last_level)};
   k_merge.flush();
   return records;
+}
+
+std::vector<std::shared_ptr<Sstable>>
+LsmEngine::split_merge(std::vector<Record> &records) {
+  std::size_t total_size{records.size()};
+  std::vector<std::shared_ptr<Sstable>> res{};
+  if (total_size <= table_target_size) {
+    std::shared_ptr<Sstable> table{create_table(records)};
+    res.push_back(table);
+    return res;
+  }
+
+  std::size_t acc_size{};
+  std::size_t total_acc{};
+  int last_pos{};
+  for (int i{}; i < records.size(); ++i) {
+    if (acc_size >= table_target_size) {
+      total_acc += acc_size;
+      std::shared_ptr<Sstable> table{
+          create_table(std::span{records}.subspan(last_pos, i - last_pos))};
+      res.push_back(table);
+      last_pos = i;
+      if ((total_size - total_acc) < table_target_size)
+        break;
+      acc_size = 0;
+    }
+    acc_size += records[i].size;
+  }
+
+  if (last_pos < records.size()) {
+    std::shared_ptr<Sstable> table{create_table(
+        std::span{records}.subspan(last_pos, records.size() - last_pos))};
+    res.push_back(table);
+  }
+
+  return res;
+}
+
+std::shared_ptr<Sstable> LsmEngine::create_table(std::span<Record> records) {
+  std::string path{create_path()};
+  SstableWriter stable_writer{SstableWriter(path)};
+  stable_writer.flush_records({records.begin(), records.end()});
+  auto sstable{std::make_shared<Sstable>(path)};
+  sstable.get()->set_min_max(stable_writer.min_key, stable_writer.max_key);
+
+  return sstable;
 }
