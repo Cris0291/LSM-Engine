@@ -410,8 +410,5 @@ void Sstable::set_min_max(std::vector<std::byte> _min_key,
 }
 
 bool Sstable::Iterator::valid() {
-  std::cerr << "inside valid " << "curr_block: " << curr_block
-            << "index_entries size: " << parent.get()->index_entries.size()
-            << "\n";
   return curr_block < parent.get()->index_entries.size();
 }

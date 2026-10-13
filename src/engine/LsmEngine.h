@@ -57,10 +57,11 @@ private:
   friend class EngineTest_MergeNewestWinsWithManyTables_Test;
   friend class EngineTest_TombstoneLast_Test;
   friend class EngineTest_TombstoneNotLast_Test;
+  friend class EngineTest_SplitMergeIsEqual_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit,
-            std::size_t _table_target_size = 2000);
+            std::size_t _table_target_size = 2000000);
   ~LsmEngine();
   std::optional<std::vector<std::byte>> get(std::vector<std::byte> key);
   void put(std::vector<std::byte> key, std::vector<std::byte> value);
