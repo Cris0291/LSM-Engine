@@ -52,12 +52,17 @@ private:
   std::vector<std::shared_ptr<Sstable>>
   split_merge(std::vector<Record> &records);
   std::shared_ptr<Sstable> create_table(std::span<Record> recods);
+  void query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
+                            std::vector<std::byte> &min_key,
+                            std::vector<std::byte> &max_key);
   friend class EngineTest_LevelReadPath_Test;
   friend class EngineTest_MergeWithManyTables_Test;
   friend class EngineTest_MergeNewestWinsWithManyTables_Test;
   friend class EngineTest_TombstoneLast_Test;
   friend class EngineTest_TombstoneNotLast_Test;
   friend class EngineTest_SplitMergeIsEqual_Test;
+  friend class EngineTest_SplitMergeIsDisjoint_Test;
+  friend class EngineTest_SplitMergeIsOrdered_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit,

@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <format>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <random>
 #include <span>
@@ -255,10 +256,6 @@ LsmEngine::search_level(const std::vector<std::byte> &key,
     int low_comparison{compare_bytes(level[mid].get()->min_key, key)};
     int high_comparison{compare_bytes(level[mid].get()->max_key, key)};
 
-    std::cerr << "low " << low << "mid " << mid << "high " << high
-              << "low comparison " << low_comparison << "high_comparison "
-              << high_comparison << "\n";
-
     if (low == high) {
       if ((low_comparison > 0 && high_comparison < 0) || low_comparison == 0 ||
           high_comparison == 0) {
@@ -307,26 +304,16 @@ LsmEngine::merge_tables(std::span<std::shared_ptr<Sstable>> tables,
 
 std::vector<std::shared_ptr<Sstable>>
 LsmEngine::split_merge(std::vector<Record> &records) {
-  std::size_t total_size{records.size()};
   std::vector<std::shared_ptr<Sstable>> res{};
-  if (total_size <= table_target_size) {
-    std::shared_ptr<Sstable> table{create_table(records)};
-    res.push_back(table);
-    return res;
-  }
 
   std::size_t acc_size{};
-  std::size_t total_acc{};
   int last_pos{};
   for (int i{}; i < records.size(); ++i) {
     if (acc_size >= table_target_size) {
-      total_acc += acc_size;
       std::shared_ptr<Sstable> table{
           create_table(std::span{records}.subspan(last_pos, i - last_pos))};
       res.push_back(table);
       last_pos = i;
-      if ((total_size - total_acc) < table_target_size)
-        break;
       acc_size = 0;
     }
     acc_size += records[i].size;
@@ -342,6 +329,7 @@ LsmEngine::split_merge(std::vector<Record> &records) {
 }
 
 std::shared_ptr<Sstable> LsmEngine::create_table(std::span<Record> records) {
+  std::cerr << "i was right " << "\n";
   std::string path{create_path()};
   SstableWriter stable_writer{SstableWriter(path)};
   stable_writer.flush_records({records.begin(), records.end()});
@@ -349,4 +337,33 @@ std::shared_ptr<Sstable> LsmEngine::create_table(std::span<Record> records) {
   sstable.get()->set_min_max(stable_writer.min_key, stable_writer.max_key);
 
   return sstable;
+}
+
+void LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
+                                     std::vector<std::byte> &min_key,
+                                     std::vector<std::byte> &max_key) {
+  auto min_boundry = [&] -> int {
+    std::size_t low{};
+    std::size_t high{tables.size() - 1};
+    int res{};
+
+    while (low <= high) {
+      std::size_t mid = low + (high - low) / 2;
+
+      int low_comparison{compare_bytes(tables[mid].get()->min_key, min_key)};
+      int high_comparison{compare_bytes(tables[mid].get()->max_key, min_key)};
+
+      if (low_comparison >= 0 && high_comparison >= 0) {
+        res = mid;
+        high = mid - 1;
+      } else if (low_comparison >= 0 && high_comparison <= 0) {
+        res = mid;
+        break;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    return res;
+  };
 }
