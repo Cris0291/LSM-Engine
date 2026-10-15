@@ -329,7 +329,6 @@ LsmEngine::split_merge(std::vector<Record> &records) {
 }
 
 std::shared_ptr<Sstable> LsmEngine::create_table(std::span<Record> records) {
-  std::cerr << "i was right " << "\n";
   std::string path{create_path()};
   SstableWriter stable_writer{SstableWriter(path)};
   stable_writer.flush_records({records.begin(), records.end()});
@@ -339,31 +338,80 @@ std::shared_ptr<Sstable> LsmEngine::create_table(std::span<Record> records) {
   return sstable;
 }
 
-void LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
-                                     std::vector<std::byte> &min_key,
-                                     std::vector<std::byte> &max_key) {
+std::pair<int, int>
+LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
+                                std::vector<std::byte> &min_key,
+                                std::vector<std::byte> &max_key) {
   auto min_boundry = [&] -> int {
     std::size_t low{};
     std::size_t high{tables.size() - 1};
     int res{};
 
+    std::cerr << "MIN KEY LOOP" << "\n";
     while (low <= high) {
       std::size_t mid = low + (high - low) / 2;
+      std::cerr << "low :" << low << "high: " << high << "mid: " << mid << "\n";
 
       int low_comparison{compare_bytes(tables[mid].get()->min_key, min_key)};
       int high_comparison{compare_bytes(tables[mid].get()->max_key, min_key)};
 
-      if (low_comparison >= 0 && high_comparison >= 0) {
+      std::cerr << "low comp: " << low_comparison
+                << "high comp: " << high_comparison << "\n";
+
+      if (low_comparison <= 0 && high_comparison >= 0) {
+        res = mid;
+        std::cerr << "HIT" << res << "\n";
+        break;
+      } else if (low_comparison >= 0 && high_comparison >= 0) {
         res = mid;
         high = mid - 1;
-      } else if (low_comparison >= 0 && high_comparison <= 0) {
-        res = mid;
-        break;
+        std::cerr << "low >=0 high >= 0: " << "new res: " << res
+                  << "new high: " << high << "\n";
       } else {
         low = mid + 1;
+        std::cerr << "NEXT: " << low << "\n";
       }
     }
 
     return res;
   };
+
+  auto max_boundry = [&] -> int {
+    std::size_t low{};
+    std::size_t high{tables.size() - 1};
+    int res{};
+
+    std::cerr << "MAX KEY LOOP" << "\n";
+    while (low <= high) {
+      std::size_t mid = low + (high - low) / 2;
+      std::cerr << "low :" << low << "high: " << high << "mid: " << mid << "\n";
+
+      int low_comparison{compare_bytes(tables[mid].get()->min_key, max_key)};
+      int high_comparison{compare_bytes(tables[mid].get()->max_key, max_key)};
+
+      std::cerr << "low comp: " << low_comparison
+                << "high comp: " << high_comparison << "\n";
+
+      if (low_comparison <= 0 && high_comparison >= 0) {
+        res = mid;
+        std::cerr << "HIT" << res << "\n";
+        break;
+      } else if (low_comparison <= 0 && high_comparison <= 0) {
+        res = mid;
+        low = mid + 1;
+        std::cerr << "low <=0 high <= 0: " << "new res: " << res
+                  << "new high: " << high << "\n";
+      } else {
+        high = mid - 1;
+        std::cerr << "NEXT: " << low << "\n";
+      }
+    }
+
+    return res;
+  };
+
+  int l_boundry{min_boundry()};
+  int r_boundry{max_boundry()};
+
+  return {l_boundry, r_boundry};
 }
