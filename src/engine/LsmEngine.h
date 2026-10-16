@@ -53,7 +53,7 @@ private:
   std::vector<std::shared_ptr<Sstable>>
   split_merge(std::vector<Record> &records);
   std::shared_ptr<Sstable> create_table(std::span<Record> recods);
-  std::pair<int, int>
+  std::pair<std::optional<int>, std::optional<int>>
   query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
                        std::vector<std::byte> &min_key,
                        std::vector<std::byte> &max_key);
@@ -67,6 +67,10 @@ private:
   friend class EngineTest_SplitMergeIsOrdered_Test;
   friend class EngineTest_QueryOverlapRangeWithMultipleTables_Test;
   friend class EngineTest_QueryOverlapRangeWithOneTables_Test;
+  friend class EngineTest_QueryOverlapRangeNoTablesAfter_Test;
+  friend class EngineTest_QueryOverlapRangeNoTablesBefore_Test;
+  friend class EngineTest_QueryOverlapRangeNoMiddleTable_Test;
+  friend class EngineTest_QueryOverlapRangeAllTable_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit,
