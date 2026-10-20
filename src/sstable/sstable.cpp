@@ -283,9 +283,6 @@ ReadBlockResult Sstable::read_block(std::vector<std::byte> &block,
       return ReadBlockResult::GOOD;
     }
     if (read_result < 0) {
-      std::cerr << "pread failed " << "fd" << fd << "errno" << errno
-                << "size :" << size << "offset: " << offset
-                << "fiel size: " << file_size << strerror(errno) << "\n";
       return ReadBlockResult::ERROR;
     }
     block_result += read_result;
@@ -397,9 +394,7 @@ void Sstable::Iterator::fill_buffer(std::shared_ptr<Sstable> parent) {
     throw std::runtime_error("iterator failed");
   }
 
-  std::size_t total_size_without_header{buffer.size() - HEADER_SIZE};
-  parent->parse_blocks(buffer, records_buffer, total_size_without_header,
-                       HEADER_SIZE);
+  parent->parse_blocks(buffer, records_buffer, buffer.size(), HEADER_SIZE);
 }
 
 // this is a temporary method

@@ -71,6 +71,7 @@ private:
   friend class EngineTest_QueryOverlapRangeNoTablesBefore_Test;
   friend class EngineTest_QueryOverlapRangeNoMiddleTable_Test;
   friend class EngineTest_QueryOverlapRangeAllTable_Test;
+  friend class EngineTest_MergeShouldNotDropLast_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit,
