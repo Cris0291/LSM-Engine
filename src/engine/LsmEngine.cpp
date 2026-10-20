@@ -409,3 +409,33 @@ LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
 
   return {l_boundry, r_boundry};
 }
+
+void LsmEngine::compact(std::vector<std::shared_ptr<Sstable>> &tables,
+                        std::size_t curr_level) {
+  auto min_max{get_table_minmax(tables)};
+  std::size_t next_level{curr_level + 1};
+  auto overap_range{
+      query_overlap_tables(records[next_level], min_max.first, min_max.second)};
+}
+
+std::pair<std::vector<std::byte>, std::vector<std::byte>>
+LsmEngine::get_table_minmax(
+    const std::vector<std::shared_ptr<Sstable>> &tables) {
+  std::vector<std::byte> *min{&(tables[0].get()->min_key)};
+  std::vector<std::byte> *max{&(tables[0].get()->max_key)};
+
+  for (int i{1}; i < tables.size(); ++i) {
+    int min_res{compare_bytes(tables[i]->min_key, *min)};
+    int max_res{compare_bytes(tables[i]->max_key, *max)};
+
+    if (min_res < 0) {
+      min = &(tables[i]->min_key);
+    }
+
+    if (max_res > 0) {
+      max = &(tables[i]->max_key);
+    }
+  }
+
+  return {*min, *max};
+}

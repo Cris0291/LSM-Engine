@@ -57,6 +57,10 @@ private:
   query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
                        std::vector<std::byte> &min_key,
                        std::vector<std::byte> &max_key);
+  void compact(std::vector<std::shared_ptr<Sstable>> &tables,
+               std::size_t curr_level);
+  std::pair<std::vector<std::byte>, std::vector<std::byte>>
+  get_table_minmax(const std::vector<std::shared_ptr<Sstable>> &tables);
   friend class EngineTest_LevelReadPath_Test;
   friend class EngineTest_MergeWithManyTables_Test;
   friend class EngineTest_MergeNewestWinsWithManyTables_Test;
