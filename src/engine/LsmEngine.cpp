@@ -422,14 +422,39 @@ LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
 }
 
 void LsmEngine::compact(std::vector<std::shared_ptr<Sstable>> &tables,
-                        std::size_t curr_level) {
-  auto min_max{get_table_minmax(tables)};
+                        std::size_t curr_level,
+                        std::size_t last_nonempty_level) {
+  std::size_t zero_level{};
   std::size_t next_level{curr_level + 1};
+  bool is_last_level{curr_level + 1 == last_nonempty_level};
+
+  std::pair<std::vector<std::byte>, std::vector<std::byte>> min_max{};
+  if (curr_level == zero_level) {
+    min_max = std::move(get_table_minmax(tables));
+  } else {
+    std::size_t curr_level_last_pos{records[curr_level].size() - 1};
+    min_max.first = records[curr_level][0]->min_key;
+    min_max.second = records[curr_level][curr_level_last_pos]->max_key;
+  }
+
   auto overap_range{
       query_overlap_tables(records[next_level], min_max.first, min_max.second)};
   // now that i have the next level range my strategy is to copy curr level and
   // overlap of next level the point of the copy is to avoid data lost due to an
   // unexpected condition like a power off
+  std::vector<std::shared_ptr<Sstable>> copy_tables{};
+  if (overap_range.first.has_value() && overap_range.second.has_value()) {
+    copy_tables = tables;
+    copy_tables.insert(copy_tables.end(),
+                       records[next_level].begin() + overap_range.first.value(),
+                       records[next_level].begin() +
+                           overap_range.second.value());
+  } else {
+    copy_tables = tables;
+  }
+
+  std::vector<Record> records{merge_tables(copy_tables, is_last_level)};
+  std::vector<std::shared_ptr<Sstable>> new_tables{split_merge(records)};
 }
 
 std::pair<std::vector<std::byte>, std::vector<std::byte>>
