@@ -1393,6 +1393,89 @@ TEST_F(EngineTest, QueryOverlapRangeNoMiddleTable) {
   EXPECT_EQ(std::nullopt, min_max_boundry.second);
 }
 
+TEST_F(EngineTest, QueryOverlapRangeSpanGap) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit, 50)};
+  std::vector<Record> res{};
+
+  std::string key1_L1{"a"};
+  std::string key2_L1{"b"};
+  std::string key3_L1{"c"};
+  std::string key4_L1{"d"};
+  std::string key5_L1{"e"};
+  std::string key6_L1{"f"};
+  std::string key7_L1{"g"};
+  std::string key8_L1{"h"};
+  std::string key9_L1{"i"};
+  std::string key10_L1{"j"};
+  std::string key11_L1{"k"};
+  std::string key12_L1{"l"};
+  std::string key13_L1{"m"};
+  std::string key14_L1{"n"};
+  std::string key15_L1{"o"};
+  std::string key16_L1{"p"};
+  std::string key17_L1{"q"};
+  std::string key18_L1{"r"};
+  std::string key19_L1{"s"};
+  std::string key20_L1{"t"};
+  std::string key21_L1{"u"};
+  std::string key22_L1{"v"};
+  std::string key23_L1{"w"};
+  std::string key24_L1{"x"};
+  std::string key25_L1{"y"};
+  std::string key26_L1{"z"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key11_L1, key6_L1, OperationRecord::PUT},
+      {key12_L1, key7_L1, OperationRecord::PUT},
+      {key13_L1, key8_L1, OperationRecord::PUT},
+      {key14_L1, key9_L1, OperationRecord::PUT},
+      {key15_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key19_L1, key11_L1, OperationRecord::PUT},
+      {key20_L1, key12_L1, OperationRecord::PUT},
+      {key21_L1, key13_L1, OperationRecord::PUT},
+      {key22_L1, key14_L1, OperationRecord::PUT},
+      {key23_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key6_L1, key16_L1, OperationRecord::PUT},
+      {key7_L1, key17_L1, OperationRecord::PUT},
+      {key8_L1, key7_L1, OperationRecord::PUT},
+      {key9_L1, key18_L1, OperationRecord::PUT},
+      {key16_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(1, std::move(sstable1));
+  engine.add_to_level(1, std::move(sstable2));
+  engine.add_to_level(1, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  std::vector<Record> records{engine.merge_tables(engine.records[0], false)};
+
+  // Assert
+  std::size_t total_records_size{records.size()};
+  auto min_max_boundry{engine.query_overlap_tables(
+      engine.records[1], records[0].key, records[total_records_size - 1].key)};
+  EXPECT_EQ(1, min_max_boundry.first);
+  EXPECT_EQ(1, min_max_boundry.second);
+}
+
 TEST_F(EngineTest, QueryOverlapRangeAllTable) {
   // Arrange
   std::size_t threshold{650};

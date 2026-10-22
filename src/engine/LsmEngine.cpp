@@ -366,6 +366,7 @@ LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
         std::cerr << "HIT" << l_boundry.value() << "\n";
         break;
       } else if (low_comparison >= 0 && high_comparison >= 0) {
+        l_boundry = mid;
         high = mid - 1;
         std::cerr << "low >=0 high >= 0: " << "new high: " << high << "\n";
       } else {
@@ -395,6 +396,7 @@ LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
         std::cerr << "HIT" << r_boundry.value() << "\n";
         break;
       } else if (low_comparison <= 0 && high_comparison <= 0) {
+        r_boundry = mid;
         low = mid + 1;
         std::cerr << "low <=0 high <= 0: " << "new high: " << high << "\n";
       } else {
@@ -407,6 +409,15 @@ LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
   min_boundry();
   max_boundry();
 
+  // this is for determining if l > r that means there is a gap and no overlap
+  // exist if either value is null that means that range is out of bounds before
+  // or after
+  if (!l_boundry.has_value() || !r_boundry.has_value() ||
+      (l_boundry.value() > r_boundry.value())) {
+    l_boundry = std::nullopt;
+    r_boundry = std::nullopt;
+  }
+
   return {l_boundry, r_boundry};
 }
 
@@ -416,6 +427,9 @@ void LsmEngine::compact(std::vector<std::shared_ptr<Sstable>> &tables,
   std::size_t next_level{curr_level + 1};
   auto overap_range{
       query_overlap_tables(records[next_level], min_max.first, min_max.second)};
+  // now that i have the next level range my strategy is to copy curr level and
+  // overlap of next level the point of the copy is to avoid data lost due to an
+  // unexpected condition like a power off
 }
 
 std::pair<std::vector<std::byte>, std::vector<std::byte>>

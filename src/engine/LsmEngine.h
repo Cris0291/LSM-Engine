@@ -74,6 +74,7 @@ private:
   friend class EngineTest_QueryOverlapRangeNoTablesAfter_Test;
   friend class EngineTest_QueryOverlapRangeNoTablesBefore_Test;
   friend class EngineTest_QueryOverlapRangeNoMiddleTable_Test;
+  friend class EngineTest_QueryOverlapRangeSpanGap_Test;
   friend class EngineTest_QueryOverlapRangeAllTable_Test;
   friend class EngineTest_MergeShouldNotDropLast_Test;
 
