@@ -6,6 +6,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
@@ -406,4 +407,12 @@ void Sstable::set_min_max(std::vector<std::byte> _min_key,
 
 bool Sstable::Iterator::valid() {
   return curr_block < parent.get()->index_entries.size();
+}
+
+void Sstable::unlink_fd() {
+  char proc_path[64];
+  snprintf(proc_path, sizeof(proc_path), "proc/self/fd/%d", fd);
+  // i am not checking for an error perhaps the bes strategy is to filter those
+  // that are errors and retry later
+  unlink(proc_path);
 }

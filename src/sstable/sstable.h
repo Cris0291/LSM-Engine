@@ -79,4 +79,5 @@ public:
   // this method is temporary
   void set_min_max(std::vector<std::byte> _min_key,
                    std::vector<std::byte> _max_key);
+  void unlink_fd();
 };

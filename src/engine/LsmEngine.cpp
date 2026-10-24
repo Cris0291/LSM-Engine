@@ -22,6 +22,7 @@
 #include <string>
 #include <sys/file.h>
 #include <unistd.h>
+#include <utility>
 
 LsmEngine::LsmEngine(std::string dir_path, std::size_t threshold,
                      MemoryUnit unit, std::size_t _table_target_size)
@@ -453,8 +454,35 @@ void LsmEngine::compact(std::vector<std::shared_ptr<Sstable>> &tables,
     copy_tables = tables;
   }
 
-  std::vector<Record> records{merge_tables(copy_tables, is_last_level)};
-  std::vector<std::shared_ptr<Sstable>> new_tables{split_merge(records)};
+  std::vector<Record> merged_records{merge_tables(copy_tables, is_last_level)};
+  std::vector<std::shared_ptr<Sstable>> new_tables{split_merge(merged_records)};
+
+  // By now all the new tables have beed fsynced but if there is a power off
+  // these new tables will just lie in the engine directory more specifically
+  // in the tables subdirectory so i need a way to map this tables so that i
+  // can distinguish them, also this implementation can be improved for now i
+  // am just going to copy all of teh records in order to avoid any data
+  // corruption later i can add a mutuxes or rely on atomic operations for now
+  // since the imlementation is single threaed is enough
+  auto temp_records = records;
+  temp_records[curr_level].clear();
+
+  if (overap_range.first.has_value() && overap_range.second.has_value()) {
+    auto it{temp_records[next_level].begin()};
+    temp_records[next_level].erase(it + overap_range.first.value(),
+                                   it + overap_range.second.value());
+  }
+
+  temp_records[next_level].insert(temp_records[next_level].end(),
+                                  std::make_move_iterator(new_tables.begin()),
+                                  std::make_move_iterator(new_tables.end()));
+
+  sort_level(temp_records[next_level]);
+  std::swap(records, temp_records);
+
+  for (auto &table : copy_tables) {
+    table->unlink_fd();
+  }
 }
 
 std::pair<std::vector<std::byte>, std::vector<std::byte>>
