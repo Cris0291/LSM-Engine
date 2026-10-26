@@ -290,7 +290,7 @@ void LsmEngine::sort_level(std::vector<std::shared_ptr<Sstable>> &level) {
   std::sort(
       level.begin(), level.end(),
       [](const std::shared_ptr<Sstable> &a, const std::shared_ptr<Sstable> &b) {
-        int max_to_min{compare_bytes(a->max_key, b->min_key)};
+        int max_to_min{compare_bytes(a->min_key, b->min_key)};
         return max_to_min < 0;
       });
 }
@@ -351,28 +351,22 @@ LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
     int low{};
     int high = tables.size() - 1;
 
-    std::cerr << "MIN KEY LOOP" << "\n";
     while (low <= high) {
       int mid = low + (high - low) / 2;
-      std::cerr << "low :" << low << "high: " << high << "mid: " << mid << "\n";
 
       int low_comparison{compare_bytes(tables[mid].get()->min_key, min_key)};
       int high_comparison{compare_bytes(tables[mid].get()->max_key, min_key)};
 
-      std::cerr << "low comp: " << low_comparison
-                << "high comp: " << high_comparison << "\n";
-
       if (low_comparison <= 0 && high_comparison >= 0) {
         l_boundry = mid;
-        std::cerr << "HIT" << l_boundry.value() << "\n";
+
         break;
       } else if (low_comparison >= 0 && high_comparison >= 0) {
         l_boundry = mid;
         high = mid - 1;
-        std::cerr << "low >=0 high >= 0: " << "new high: " << high << "\n";
+
       } else {
         low = mid + 1;
-        std::cerr << "NEXT: " << low << "\n";
       }
     }
   };
@@ -381,28 +375,21 @@ LsmEngine::query_overlap_tables(std::span<std::shared_ptr<Sstable>> tables,
     int low{};
     int high = tables.size() - 1;
 
-    std::cerr << "MAX KEY LOOP" << "\n";
     while (low <= high) {
       int mid = low + (high - low) / 2;
-      std::cerr << "low :" << low << "high: " << high << "mid: " << mid << "\n";
 
       int low_comparison{compare_bytes(tables[mid].get()->min_key, max_key)};
       int high_comparison{compare_bytes(tables[mid].get()->max_key, max_key)};
 
-      std::cerr << "low comp: " << low_comparison
-                << "high comp: " << high_comparison << "\n";
-
       if (low_comparison <= 0 && high_comparison >= 0) {
         r_boundry = mid;
-        std::cerr << "HIT" << r_boundry.value() << "\n";
+
         break;
       } else if (low_comparison <= 0 && high_comparison <= 0) {
         r_boundry = mid;
         low = mid + 1;
-        std::cerr << "low <=0 high <= 0: " << "new high: " << high << "\n";
       } else {
         high = mid - 1;
-        std::cerr << "NEXT: " << low << "\n";
       }
     }
   };
@@ -438,6 +425,10 @@ void LsmEngine::compact(std::vector<std::shared_ptr<Sstable>> &tables,
     min_max.second = records[curr_level][curr_level_last_pos]->max_key;
   }
 
+  std::cerr << "min max first" << from_bytes_to_string(min_max.first)
+            << "min max second " << from_bytes_to_string(min_max.second)
+            << "\n";
+
   auto overap_range{
       query_overlap_tables(records[next_level], min_max.first, min_max.second)};
   // now that i have the next level range my strategy is to copy curr level and
@@ -449,12 +440,13 @@ void LsmEngine::compact(std::vector<std::shared_ptr<Sstable>> &tables,
     copy_tables.insert(copy_tables.end(),
                        records[next_level].begin() + overap_range.first.value(),
                        records[next_level].begin() +
-                           overap_range.second.value());
+                           overap_range.second.value() + 1);
   } else {
     copy_tables = tables;
   }
 
   std::vector<Record> merged_records{merge_tables(copy_tables, is_last_level)};
+  std::cerr << "merge size " << merged_records.size() << "\n";
   std::vector<std::shared_ptr<Sstable>> new_tables{split_merge(merged_records)};
 
   // By now all the new tables have beed fsynced but if there is a power off
@@ -470,12 +462,18 @@ void LsmEngine::compact(std::vector<std::shared_ptr<Sstable>> &tables,
   if (overap_range.first.has_value() && overap_range.second.has_value()) {
     auto it{temp_records[next_level].begin()};
     temp_records[next_level].erase(it + overap_range.first.value(),
-                                   it + overap_range.second.value());
+                                   it + overap_range.second.value() + 1);
+    std::cerr << "temp records size: " << temp_records[next_level].size()
+              << "index 1: " << overap_range.first.value()
+              << "index 2 :" << overap_range.second.value() << "\n";
   }
+  std::cerr << "new tables size: " << new_tables.size() << "\n";
 
   temp_records[next_level].insert(temp_records[next_level].end(),
                                   std::make_move_iterator(new_tables.begin()),
                                   std::make_move_iterator(new_tables.end()));
+
+  std::cerr << "temp_records size: " << temp_records[next_level].size() << "\n";
 
   sort_level(temp_records[next_level]);
   std::swap(records, temp_records);

@@ -410,9 +410,8 @@ bool Sstable::Iterator::valid() {
 }
 
 void Sstable::unlink_fd() {
-  char proc_path[64];
-  snprintf(proc_path, sizeof(proc_path), "proc/self/fd/%d", fd);
+
   // i am not checking for an error perhaps the bes strategy is to filter those
   // that are errors and retry later
-  unlink(proc_path);
+  unlink(sstable_path.data());
 }

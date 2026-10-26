@@ -61,6 +61,14 @@ private:
                std::size_t curr_level, std::size_t last_nonempty_level);
   std::pair<std::vector<std::byte>, std::vector<std::byte>>
   get_table_minmax(const std::vector<std::shared_ptr<Sstable>> &tables);
+  static std::string from_bytes_to_string(std::vector<std::byte> bytes) {
+    std::string s;
+    for (std::byte b : bytes) {
+      s.push_back(static_cast<char>(b));
+    }
+
+    return s;
+  }
   friend class EngineTest_LevelReadPath_Test;
   friend class EngineTest_MergeWithManyTables_Test;
   friend class EngineTest_MergeNewestWinsWithManyTables_Test;
@@ -77,6 +85,7 @@ private:
   friend class EngineTest_QueryOverlapRangeSpanGap_Test;
   friend class EngineTest_QueryOverlapRangeAllTable_Test;
   friend class EngineTest_MergeShouldNotDropLast_Test;
+  friend class EngineTest_CompactRoundTrip_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit,
