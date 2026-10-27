@@ -1621,7 +1621,7 @@ TEST_F(EngineTest, CompactRoundTrip) {
   // Arrange
   std::size_t threshold{650};
   MemoryUnit unit{MemoryUnit::B};
-  LsmEngine engine{LsmEngine(dir_path, threshold, unit, 50)};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit, 10)};
   std::vector<Record> res{};
 
   std::string key1_L1{"a"};
@@ -1700,21 +1700,12 @@ TEST_F(EngineTest, CompactRoundTrip) {
 
   // Assert
   EXPECT_TRUE(engine.records[0].empty());
-  std::cerr << "lev 1 size: " << engine.records[1].size() << "\n";
   for (int i{1}; i < engine.records[1].size(); ++i) {
     int prev{i - 1};
     int min_res{compare_bytes(engine.records[1][prev]->min_key,
                               engine.records[1][i]->min_key)};
     int max_res{compare_bytes(engine.records[1][prev]->max_key,
                               engine.records[1][i]->min_key)};
-
-    std::string temp_1{from_bytes_to_string(engine.records[1][prev]->min_key)};
-    std::string temp_2{from_bytes_to_string(engine.records[1][prev]->max_key)};
-    std::string temp_3{from_bytes_to_string(engine.records[1][i]->min_key)};
-    std::string temp_4{from_bytes_to_string(engine.records[1][i]->max_key)};
-
-    std::cerr << "keys " << "prev min: " << temp_1 << "prev max: " << temp_2
-              << "curr min: " << temp_3 << "curr max: " << temp_4 << "\n";
 
     EXPECT_LT(min_res, 0);
     EXPECT_LT(max_res, 0);
@@ -1726,5 +1717,405 @@ TEST_F(EngineTest, CompactRoundTrip) {
   for (int i{}; i < oracle_records.size(); ++i) {
     int res{compare_bytes(records[i].key, oracle_records[i].key)};
     EXPECT_EQ(res, 0);
+  }
+}
+
+TEST_F(EngineTest, ResurrectionCompact) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit, 10)};
+  std::vector<Record> res{};
+
+  std::string key1_L1{"a"};
+  std::string key2_L1{"b"};
+  std::string key3_L1{"c"};
+  std::string key4_L1{"d"};
+  std::string key5_L1{"e"};
+  std::string key6_L1{"f"};
+  std::string key7_L1{"g"};
+  std::string key8_L1{"h"};
+  std::string key9_L1{"i"};
+  std::string key10_L1{"j"};
+  std::string key11_L1{"k"};
+  std::string key12_L1{"l"};
+  std::string key13_L1{"m"};
+  std::string key14_L1{"n"};
+  std::string key15_L1{"o"};
+  std::string key16_L1{"p"};
+  std::string key17_L1{"q"};
+  std::string key18_L1{"r"};
+  std::string key19_L1{"s"};
+  std::string key20_L1{"t"};
+  std::string key21_L1{"u"};
+  std::string key22_L1{"v"};
+  std::string key23_L1{"w"};
+  std::string key24_L1{"x"};
+  std::string key25_L1{"y"};
+  std::string key26_L1{"z"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key1_L1, key16_L1, OperationRecord::DELETE},
+      {key7_L1, key17_L1, OperationRecord::PUT},
+      {key8_L1, key7_L1, OperationRecord::PUT},
+      {key9_L1, key18_L1, OperationRecord::PUT},
+      {key15_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(1, std::move(sstable1));
+  engine.add_to_level(1, std::move(sstable2));
+  engine.add_to_level(1, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  std::vector<std::shared_ptr<Sstable>> temp_merge{engine.records[0]};
+  temp_merge.insert(temp_merge.end(), engine.records[1].begin(),
+                    engine.records[1].end());
+
+  std::vector<Record> records{engine.merge_tables(temp_merge, false)};
+
+  engine.compact(engine.records[0], 0, 2);
+
+  // Assert
+  for (int i{1}; i < engine.records[1].size(); ++i) {
+    int prev{i - 1};
+    int min_res{compare_bytes(engine.records[1][prev]->min_key,
+                              engine.records[1][i]->min_key)};
+    int max_res{compare_bytes(engine.records[1][prev]->max_key,
+                              engine.records[1][i]->min_key)};
+
+    EXPECT_LT(min_res, 0);
+    EXPECT_LT(max_res, 0);
+  }
+
+  std::vector<Record> oracle_records{
+      engine.merge_tables(engine.records[1], false)};
+  EXPECT_EQ(records.size(), oracle_records.size());
+
+  bool is_deleted{false};
+  for (int i{}; i < oracle_records.size(); ++i) {
+    int res{compare_bytes(records[i].key, oracle_records[i].key)};
+    std::string test_key{from_bytes_to_string(oracle_records[i].key)};
+    if (test_key == key1_L1 &&
+        oracle_records[i].op == OperationRecord::DELETE) {
+      is_deleted = true;
+    }
+    EXPECT_EQ(res, 0);
+  }
+
+  EXPECT_TRUE(is_deleted);
+}
+
+TEST_F(EngineTest, DeletionCompact) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit, 10)};
+  std::vector<Record> res{};
+
+  std::string key1_L1{"a"};
+  std::string key2_L1{"b"};
+  std::string key3_L1{"c"};
+  std::string key4_L1{"d"};
+  std::string key5_L1{"e"};
+  std::string key6_L1{"f"};
+  std::string key7_L1{"g"};
+  std::string key8_L1{"h"};
+  std::string key9_L1{"i"};
+  std::string key10_L1{"j"};
+  std::string key11_L1{"k"};
+  std::string key12_L1{"l"};
+  std::string key13_L1{"m"};
+  std::string key14_L1{"n"};
+  std::string key15_L1{"o"};
+  std::string key16_L1{"p"};
+  std::string key17_L1{"q"};
+  std::string key18_L1{"r"};
+  std::string key19_L1{"s"};
+  std::string key20_L1{"t"};
+  std::string key21_L1{"u"};
+  std::string key22_L1{"v"};
+  std::string key23_L1{"w"};
+  std::string key24_L1{"x"};
+  std::string key25_L1{"y"};
+  std::string key26_L1{"z"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key1_L1, key16_L1, OperationRecord::DELETE},
+      {key7_L1, key17_L1, OperationRecord::PUT},
+      {key8_L1, key7_L1, OperationRecord::PUT},
+      {key9_L1, key18_L1, OperationRecord::PUT},
+      {key15_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(1, std::move(sstable1));
+  engine.add_to_level(1, std::move(sstable2));
+  engine.add_to_level(1, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  std::vector<std::shared_ptr<Sstable>> temp_merge{engine.records[0]};
+  temp_merge.insert(temp_merge.end(), engine.records[1].begin(),
+                    engine.records[1].end());
+
+  std::vector<Record> records{engine.merge_tables(temp_merge, true)};
+
+  engine.compact(engine.records[0], 0, 1);
+
+  // Assert
+  for (int i{1}; i < engine.records[1].size(); ++i) {
+    int prev{i - 1};
+    int min_res{compare_bytes(engine.records[1][prev]->min_key,
+                              engine.records[1][i]->min_key)};
+    int max_res{compare_bytes(engine.records[1][prev]->max_key,
+                              engine.records[1][i]->min_key)};
+
+    EXPECT_LT(min_res, 0);
+    EXPECT_LT(max_res, 0);
+  }
+
+  std::vector<Record> oracle_records{
+      engine.merge_tables(engine.records[1], false)};
+  EXPECT_EQ(records.size(), oracle_records.size());
+
+  bool is_deleted{false};
+  for (int i{}; i < oracle_records.size(); ++i) {
+    int res{compare_bytes(records[i].key, oracle_records[i].key)};
+    std::string test_key{from_bytes_to_string(oracle_records[i].key)};
+    if (test_key == key1_L1 &&
+        oracle_records[i].op == OperationRecord::DELETE) {
+      is_deleted = true;
+    }
+    EXPECT_EQ(res, 0);
+  }
+
+  EXPECT_FALSE(is_deleted);
+}
+
+TEST_F(EngineTest, NonOverlapping) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit, 5)};
+  std::vector<Record> res{};
+
+  std::string key1_L1{"a"};
+  std::string key2_L1{"b"};
+  std::string key3_L1{"c"};
+  std::string key4_L1{"d"};
+  std::string key5_L1{"e"};
+  std::string key6_L1{"f"};
+  std::string key7_L1{"g"};
+  std::string key8_L1{"h"};
+  std::string key9_L1{"i"};
+  std::string key10_L1{"j"};
+  std::string key11_L1{"k"};
+  std::string key12_L1{"l"};
+  std::string key13_L1{"m"};
+  std::string key14_L1{"n"};
+  std::string key15_L1{"o"};
+  std::string key16_L1{"p"};
+  std::string key17_L1{"q"};
+  std::string key18_L1{"r"};
+  std::string key19_L1{"s"};
+  std::string key20_L1{"t"};
+  std::string key21_L1{"u"};
+  std::string key22_L1{"v"};
+  std::string key23_L1{"w"};
+  std::string key24_L1{"x"};
+  std::string key25_L1{"y"};
+  std::string key26_L1{"z"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key1_L1, key16_L1, OperationRecord::PUT},
+      {key7_L1, key17_L1, OperationRecord::PUT},
+      {key8_L1, key7_L1, OperationRecord::PUT},
+      {key9_L1, key18_L1, OperationRecord::PUT},
+      {key15_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(1, std::move(sstable1));
+  engine.add_to_level(1, std::move(sstable2));
+  engine.add_to_level(1, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  std::vector<std::shared_ptr<Sstable>> temp_merge{engine.records[0]};
+  temp_merge.insert(temp_merge.end(), engine.records[1].begin(),
+                    engine.records[1].end());
+
+  std::vector<Record> records{engine.merge_tables(temp_merge, false)};
+
+  engine.compact(engine.records[0], 0, 1);
+
+  // Assert
+  for (int i{1}; i < engine.records[1].size(); ++i) {
+    int prev{i - 1};
+    int res{compare_bytes(engine.records[1][prev]->max_key,
+                          engine.records[1][i]->min_key)};
+
+    EXPECT_LT(res, 0);
+  }
+}
+
+TEST_F(EngineTest, DeletedFiles) {
+  // Arrange
+  std::size_t threshold{650};
+  MemoryUnit unit{MemoryUnit::B};
+  LsmEngine engine{LsmEngine(dir_path, threshold, unit, 5)};
+  std::vector<std::string> file_paths{};
+
+  std::string key1_L1{"a"};
+  std::string key2_L1{"b"};
+  std::string key3_L1{"c"};
+  std::string key4_L1{"d"};
+  std::string key5_L1{"e"};
+  std::string key6_L1{"f"};
+  std::string key7_L1{"g"};
+  std::string key8_L1{"h"};
+  std::string key9_L1{"i"};
+  std::string key10_L1{"j"};
+  std::string key11_L1{"k"};
+  std::string key12_L1{"l"};
+  std::string key13_L1{"m"};
+  std::string key14_L1{"n"};
+  std::string key15_L1{"o"};
+  std::string key16_L1{"p"};
+  std::string key17_L1{"q"};
+  std::string key18_L1{"r"};
+  std::string key19_L1{"s"};
+  std::string key20_L1{"t"};
+  std::string key21_L1{"u"};
+  std::string key22_L1{"v"};
+  std::string key23_L1{"w"};
+  std::string key24_L1{"x"};
+  std::string key25_L1{"y"};
+  std::string key26_L1{"z"};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries1{
+      {key1_L1, key1_L1, OperationRecord::PUT},
+      {key2_L1, key2_L1, OperationRecord::PUT},
+      {key3_L1, key3_L1, OperationRecord::PUT},
+      {key4_L1, key4_L1, OperationRecord::PUT},
+      {key5_L1, key5_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries2{
+      {key6_L1, key6_L1, OperationRecord::PUT},
+      {key7_L1, key7_L1, OperationRecord::PUT},
+      {key8_L1, key8_L1, OperationRecord::PUT},
+      {key9_L1, key9_L1, OperationRecord::PUT},
+      {key10_L1, key10_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries3{
+      {key11_L1, key11_L1, OperationRecord::PUT},
+      {key12_L1, key12_L1, OperationRecord::PUT},
+      {key13_L1, key13_L1, OperationRecord::PUT},
+      {key14_L1, key14_L1, OperationRecord::PUT},
+      {key15_L1, key15_L1, OperationRecord::PUT}};
+
+  std::vector<std::tuple<std::string, std::string, OperationRecord>> entries4{
+      {key1_L1, key16_L1, OperationRecord::PUT},
+      {key7_L1, key17_L1, OperationRecord::PUT},
+      {key8_L1, key7_L1, OperationRecord::PUT},
+      {key9_L1, key18_L1, OperationRecord::PUT},
+      {key15_L1, key20_L1, OperationRecord::PUT}};
+
+  auto sstable1{create_table(sstable0_file, entries1)};
+  auto sstable2{create_table(sstable1_file, entries2)};
+  auto sstable3{create_table(sstable2_file, entries3)};
+  auto sstable4{create_table(sstable3_file, entries4)};
+
+  // Act
+  engine.add_to_level(1, std::move(sstable1));
+  engine.add_to_level(1, std::move(sstable2));
+  engine.add_to_level(1, std::move(sstable3));
+  engine.add_to_level(0, std::move(sstable4));
+
+  file_paths.push_back(engine.records[0][0]->sstable_path);
+  for (auto &table : engine.records[1]) {
+    file_paths.push_back(table->sstable_path);
+  }
+
+  engine.compact(engine.records[0], 0, 1);
+
+  // Assert
+  for (std::string &path : file_paths) {
+    bool is_path{std::filesystem::exists(path)};
+    EXPECT_FALSE(is_path);
   }
 }

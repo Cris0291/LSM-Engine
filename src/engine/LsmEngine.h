@@ -86,6 +86,10 @@ private:
   friend class EngineTest_QueryOverlapRangeAllTable_Test;
   friend class EngineTest_MergeShouldNotDropLast_Test;
   friend class EngineTest_CompactRoundTrip_Test;
+  friend class EngineTest_ResurrectionCompact_Test;
+  friend class EngineTest_DeletionCompact_Test;
+  friend class EngineTest_NonOverlapping_Test;
+  friend class EngineTest_DeletedFiles_Test;
 
 public:
   LsmEngine(std::string dir_path, std::size_t threshold, MemoryUnit unit,
